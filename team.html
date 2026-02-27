@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- PWA / Home screen icon -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <meta name="theme-color" content="#37003c">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="FPL Analyzer">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>My Team - FPL Analyzer</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="theme.js"></script>
+    <script src="lang.js"></script>
+    <style>
+        .container {
+            max-width: 1000px;
+        }
+        .card {
+            margin: 20px auto;
+            background: rgba(255, 255, 255, 0.98) !important;
+            border: 2px solid rgba(66, 181, 88, 0.3);
+        }
+        .card-content {
+            max-height: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1 id="team-name-header" data-i18n="cardMyTeam">My Team</h1>
+            <p class="team-subtitle" id="team-subtitle">Loading...</p>
+            <div class="lang-switcher">
+                <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English">🇬🇧</button>
+                <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski">🇷🇸</button>
+            </div>
+            <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">🌙</button>
+        </header>
+
+        <div class="card">
+            <div class="card-content" id="team-content">
+                <div class="loading">Loading team data...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="fpl-api.js"></script>
+    <script src="prediction.js"></script>
+    <script>
+        let _fixtureMap = {};
+        // Helper to render field player with jersey number and initials
+        function renderFieldPlayer(player) {
+            const captainClass = player.isCaptain ? 'captain' : (player.isViceCaptain ? 'vice-captain' : '');
+            const points = player.eventPoints || 0;
+            const isGK = player.position === 'GKP';
+            const kitSuffix = isGK ? '_1' : '';
+            const kitUrl = player.teamCode
+                ? `https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_${player.teamCode}${kitSuffix}-66.png`
+                : '';
+            const kitImg = kitUrl
+                ? `<img class="player-kit-img" src="${kitUrl}" onerror="this.style.display='none'" referrerpolicy="no-referrer">`
+                : '';
+
+            const fixList = (_fixtureMap && _fixtureMap[player.teamId]) || [];
+            const fixHtml = fixList.map(f => {
+                const haClass = f.isHome ? 'fp-ha-home' : 'fp-ha-away';
+                const badgeUrl = f.oppCode ? `https://resources.premierleague.com/premierleague/badges/t${f.oppCode}.png` : '';
+                const badgeImg = badgeUrl ? `<img class="fp-badge" src="${badgeUrl}" onerror="this.style.display='none'">` : '';
+                return `<span class="fp-fix fp-fdr-${f.diff} ${haClass}" title="${f.isHome ? 'Home' : 'Away'} vs ${f.opp}">${badgeImg}<span class="fp-ha"><span class="fp-ha-full">${f.isHome ? 'Home' : 'Away'}</span><span class="fp-ha-abbr">${f.isHome ? 'H' : 'A'}</span></span></span>`;
+            }).join('');
+
+            return `
+                <div class="field-player player-clickable" onclick="window.open('player.html?id=${player.id}','_blank')" title="View ${player.name} profile">
+                    <div class="player-shirt-box">
+                        <div class="player-shirt ${captainClass}">${kitImg}</div>
+                        <div class="player-name-field">${player.name}</div>
+                        <div class="player-points-field">${points} pts</div>
+                    </div>
+                    <div class="player-fixtures-row">${fixHtml}</div>
+                </div>
+            `;
+        }
+
+        // Get jersey number for player
+        function getJerseyNumber(player) {
+            const positionNumbers = {
+                'GKP': 1,
+                'DEF': 2,
+                'MID': 6,
+                'FWD': 9
+            };
+
+            // Start with base number for position
+            let number = positionNumbers[player.position] || 1;
+
+            // Add variation based on pick order to make unique-ish
+            if (player.pickOrder) {
+                const offset = (player.pickOrder - 1) % 11;
+                number = number + offset;
+                if (number > 11) number = number - 11;
+            }
+
+            return number;
+        }
+
+        // Get player initials from name
+        function getPlayerInitials(name) {
+            if (!name) return '??';
+
+            const parts = name.split(' ');
+            if (parts.length === 1) {
+                return name.substring(0, 2).toUpperCase();
+            }
+
+            // Take first letter of first name and first letter of last name
+            const firstInitial = parts[0].charAt(0);
+            const lastInitial = parts[parts.length - 1].charAt(0);
+
+            return `${firstInitial}${lastInitial}`.toUpperCase();
+        }
+
+        async function loadTeam() {
+            const content = document.getElementById('team-content');
+
+            try {
+                const [managerData, teamData, fixtures, bootstrap] = await Promise.all([
+                    FPL_API.getManagerTeam(),
+                    FPL_API.getTeamComposition(),
+                    FPL_API.getFixtures(),
+                    FPL_API.getBootstrapStatic()
+                ]);
+
+                // Build fixture map
+                _fixtureMap = {};
+                bootstrap.teams.forEach(team => {
+                    const upcoming = FPL_API.getUpcomingFixtures(team.id, fixtures, 1);
+                    _fixtureMap[team.id] = upcoming.map(f => {
+                        const isHome = f.team_h === team.id;
+                        const oppId  = isHome ? f.team_a : f.team_h;
+                        const diff   = isHome ? f.team_h_difficulty : f.team_a_difficulty;
+                        const opp    = bootstrap.teams.find(tm => tm.id === oppId);
+                        return { opp: opp ? opp.short_name : '?', oppCode: opp ? opp.code : null, isHome, diff };
+                    });
+                });
+
+                // Update header
+                document.title = `${managerData.name} - My Team`;
+                document.getElementById('team-name-header').textContent = managerData.name;
+                document.getElementById('team-subtitle').textContent = `Team ID: ${FPL_API.TEAM_ID}`;
+
+                // Sort by pick order (squad position 1-15)
+                teamData.picks.sort((a, b) => a.squadPosition - b.squadPosition);
+
+                // Separate starting XI (positions 1-11) and bench (12-15)
+                const startingXI = teamData.picks.filter(p => p.squadPosition <= 11);
+                const bench = teamData.picks.filter(p => p.squadPosition > 11);
+
+                // Field visualization
+                let html = '<div class="football-field">';
+
+                // Group starting XI by player position (GKP/DEF/MID/FWD)
+                const gkp = startingXI.filter(p => p.position === 'GKP');
+                const def = startingXI.filter(p => p.position === 'DEF');
+                const mid = startingXI.filter(p => p.position === 'MID');
+                const fwd = startingXI.filter(p => p.position === 'FWD');
+
+                // Render formation (goalkeeper at top, forwards at bottom)
+                if (gkp.length > 0) {
+                    html += '<div class="field-line">';
+                    gkp.forEach(player => {
+                        html += renderFieldPlayer(player);
+                    });
+                    html += '</div>';
+                }
+
+                if (def.length > 0) {
+                    html += '<div class="field-line">';
+                    def.forEach(player => {
+                        html += renderFieldPlayer(player);
+                    });
+                    html += '</div>';
+                }
+
+                if (mid.length > 0) {
+                    html += '<div class="field-line">';
+                    mid.forEach(player => {
+                        html += renderFieldPlayer(player);
+                    });
+                    html += '</div>';
+                }
+
+                if (fwd.length > 0) {
+                    html += '<div class="field-line">';
+                    fwd.forEach(player => {
+                        html += renderFieldPlayer(player);
+                    });
+                    html += '</div>';
+                }
+
+                if (bench.length > 0) {
+                    html += '<div class="bench-section">';
+                    html += '<div class="bench-title">Substitutes</div>';
+                    html += '<div class="bench-players">';
+                    bench.forEach(player => {
+                        html += `<div class="bench-player">${renderFieldPlayer(player)}</div>`;
+                    });
+                    html += '</div>';
+                    html += '</div>';
+                }
+
+                html += '</div>';
+
+                if (teamData.entryHistory) {
+                    html += `
+                        <h3 style="margin-top: 30px; color: var(--primary-color);">Team Statistics</h3>
+                        <div class="stats-grid" style="margin-top: 20px;">
+                            <div class="stat-card">
+                                <div class="stat-card-value">${teamData.entryHistory.points}</div>
+                                <div class="stat-card-label">GW Points</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-card-value">£${(teamData.entryHistory.bank / 10).toFixed(1)}m</div>
+                                <div class="stat-card-label">Bank</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-card-value">${(teamData.entryHistory.value / 10).toFixed(1)}m</div>
+                                <div class="stat-card-label">Team Value</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-card-value">${teamData.entryHistory.event_transfers}</div>
+                                <div class="stat-card-label">Transfers Made</div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                content.innerHTML = html;
+
+            } catch (error) {
+                content.innerHTML = '<div class="loading">Error loading team data</div>';
+                console.error(error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadTeam);
+    </script>
+    <footer class="site-footer" data-i18n-html="footerHtml">
+        Made with <span class="heart">♥</span> for you by <strong>Srdjan Kojic</strong>
+        <span class="footer-sep">|</span>
+        FPL Analyzer &bull; 2025/26
+    </footer>
+</body>
+</html>

@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- PWA / Home screen icon -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <meta name="theme-color" content="#37003c">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="FPL Analyzer">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Points Prediction - FPL Analyzer</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="theme.js"></script>
+    <script src="lang.js"></script>
+    <style>
+        .container {
+            max-width: 1000px;
+        }
+        .card {
+            margin: 20px auto;
+            background: rgba(255, 255, 255, 0.98) !important;
+            border: 2px solid rgba(66, 181, 88, 0.3);
+        }
+        .card-content {
+            max-height: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <button class="back-btn" onclick="window.close()" title="Close" aria-label="Close">←</button>
+            <h1 data-i18n="cardPrediction">Points Prediction</h1>
+            <div class="lang-switcher">
+                <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English">🇬🇧</button>
+                <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski">🇷🇸</button>
+            </div>
+            <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">🌙</button>
+        </header>
+
+        <div class="card">
+            <div class="card-content" id="prediction-content">
+                <div class="loading">Calculating predictions...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="fpl-api.js"></script>
+    <script src="prediction.js"></script>
+    <script>
+        // Helper function to safely format numbers and avoid NaN
+        function safeNumber(value, decimals = 0, defaultValue = 0) {
+            const num = parseFloat(value);
+            if (isNaN(num) || num === null || num === undefined) {
+                return decimals > 0 ? defaultValue.toFixed(decimals) : defaultValue;
+            }
+            return decimals > 0 ? num.toFixed(decimals) : Math.round(num);
+        }
+
+        async function loadPredictions() {
+            const content = document.getElementById('prediction-content');
+
+            try {
+                const teamData = await FPL_API.getTeamComposition();
+                const predictions = await Predictor.predictTeamPoints(teamData.picks);
+
+                let html = `<h3>${t('nextGWPredictions')}</h3>`;
+
+                // Calculate total expected points
+                const totalExpected = predictions.reduce((sum, p) => {
+                    const points = parseFloat(p.expectedPoints) || 0;
+                    return sum + points;
+                }, 0);
+
+                html += `
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-card-value">${safeNumber(totalExpected, 0)}</div>
+                            <div class="stat-card-label">${t('expectedPoints')}</div>
+                        </div>
+                    </div>
+                `;
+
+                // Captain suggestion
+                const captainSuggestion = await Predictor.suggestCaptain(teamData.picks);
+
+                html += `<h3 style="margin-top: 30px; color: var(--primary-color);">${t('captainRec')}</h3>`;
+                html += `
+                    <div class="player-row captain">
+                        <div class="player-info">
+                            <div class="player-name">${captainSuggestion.captain.player.name} (C)</div>
+                            <div class="player-meta">${captainSuggestion.captain.player.team} • ${captainSuggestion.captain.player.position}</div>
+                        </div>
+                        <div class="player-stats">
+                            <div class="stat">
+                                <div class="stat-value">${safeNumber(captainSuggestion.captain.expectedPoints, 1)}</div>
+                                <div class="stat-label">xPts</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="player-row vice-captain">
+                        <div class="player-info">
+                            <div class="player-name">${captainSuggestion.viceCaptain.player.name} (VC)</div>
+                            <div class="player-meta">${captainSuggestion.viceCaptain.player.team} • ${captainSuggestion.viceCaptain.player.position}</div>
+                        </div>
+                        <div class="player-stats">
+                            <div class="stat">
+                                <div class="stat-value">${safeNumber(captainSuggestion.viceCaptain.expectedPoints, 1)}</div>
+                                <div class="stat-label">xPts</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                html += `<h3 style="margin-top: 30px; color: var(--primary-color);">${t('allPlayersPred')}</h3>`;
+
+                // Sort by expected points
+                predictions.sort((a, b) => {
+                    const aPoints = parseFloat(a.expectedPoints) || 0;
+                    const bPoints = parseFloat(b.expectedPoints) || 0;
+                    return bPoints - aPoints;
+                });
+
+                html += '<div class="team-grid">';
+
+                for (const pred of predictions) {
+                    const formTrend = Predictor.calculateFormTrend(pred.player);
+                    const trendColor = formTrend === 'Rising' ? '#00ff87' :
+                                      formTrend === 'Falling' ? '#ff2882' : '#666';
+
+                    html += `
+                        <div class="player-row">
+                            <div class="player-info">
+                                <div class="player-name">${pred.player.name}</div>
+                                <div class="player-meta">
+                                    ${pred.player.team} • ${pred.player.position} •
+                                    <span style="color: ${trendColor}; font-weight: bold;">${t(formTrend.toLowerCase())}</span>
+                                </div>
+                            </div>
+                            <div class="player-stats">
+                                <div class="stat">
+                                    <div class="stat-value">${safeNumber(pred.expectedPoints, 1)}</div>
+                                    <div class="stat-label">${t('xPts')}</div>
+                                </div>
+                                <div class="stat">
+                                    <div class="stat-value">${safeNumber(pred.player.form, 1)}</div>
+                                    <div class="stat-label">${t('form')}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                html += '</div>';
+
+                // Show detailed fixture analysis for top 3 players
+                html += `<h3 style="margin-top: 30px; color: var(--primary-color);">${t('top3Fixture')}</h3>`;
+
+                for (let i = 0; i < Math.min(3, predictions.length); i++) {
+                    const player = predictions[i].player;
+                    const fixtures = await Predictor.predictNext5Gameweeks(player);
+
+                    html += `
+                        <div style="margin-bottom: 25px; padding: 15px; background: var(--bg-surface, #f8f8f8); border: 1px solid var(--divider, #e5e5e5); border-radius: 8px;">
+                            <h4 style="margin-bottom: 10px;">${player.name} (${player.team})</h4>
+                            <div class="fixtures-list">
+                    `;
+
+                    for (const fixture of fixtures) {
+                        html += `
+                            <div class="fixture-item">
+                                <span class="fixture-teams">
+                                    ${fixture.isHome ? 'vs' : '@'} ${fixture.opponent}
+                                </span>
+                                <span class="fixture-difficulty difficulty-${fixture.difficulty}">
+                                    Diff: ${fixture.difficulty}
+                                </span>
+                                <span><strong>${safeNumber(fixture.expectedPoints, 1)} xPts</strong></span>
+                            </div>
+                        `;
+                    }
+
+                    html += `
+                            </div>
+                        </div>
+                    `;
+                }
+
+                content.innerHTML = html;
+            } catch (error) {
+                content.innerHTML = `<div class="loading">${t('errorPredictions')}</div>`;
+                console.error(error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadPredictions);
+    </script>
+
+    <footer class="site-footer" data-i18n-html="footerHtml">
+        Made with <span class="heart">&#x2665;</span> for you by <strong>Srdjan Kojic</strong>
+    </footer>
+</body>
+</html>

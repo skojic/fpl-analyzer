@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+    <defs>
+        <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%"  stop-color="#37003c"/>
+            <stop offset="55%" stop-color="#1e0235"/>
+            <stop offset="100%" stop-color="#0b1a0f"/>
+        </linearGradient>
+        <linearGradient id="shieldFill" x1="0" y1="0" x2="0.5" y2="1">
+            <stop offset="0%"  stop-color="#270040"/>
+            <stop offset="100%" stop-color="#0e1e10"/>
+        </linearGradient>
+        <filter id="glow">
+            <feGaussianBlur stdDeviation="4" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="starGlow">
+            <feGaussianBlur stdDeviation="3" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+    </defs>
+
+    <!-- App icon background tile -->
+    <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+    <!-- Subtle radial spotlight -->
+    <radialGradient id="spot" cx="50%" cy="48%" r="55%">
+        <stop offset="0%"  stop-color="#00ff87" stop-opacity="0.07"/>
+        <stop offset="100%" stop-color="#00ff87" stop-opacity="0"/>
+    </radialGradient>
+    <rect width="512" height="512" rx="112" fill="url(#spot)"/>
+
+    <!-- ── THREE GOLD STARS (crown, above shield) ── -->
+    <!-- left star -->
+    <g filter="url(#starGlow)" transform="translate(157,82)">
+        <polygon points="0,-22 6.8,-7.5 22.5,-7 11,3.5 14.5,19 0,10.5 -14.5,19 -11,3.5 -22.5,-7 -6.8,-7.5"
+                 fill="#ffc324" opacity="0.95"/>
+    </g>
+    <!-- centre star (raised) -->
+    <g filter="url(#starGlow)" transform="translate(256,56)">
+        <polygon points="0,-26 8,-9 26,-7.5 13,5 16.5,22 0,13 -16.5,22 -13,5 -26,-7.5 -8,-9"
+                 fill="#ffc324" opacity="0.98"/>
+    </g>
+    <!-- right star -->
+    <g filter="url(#starGlow)" transform="translate(355,82)">
+        <polygon points="0,-22 6.8,-7.5 22.5,-7 11,3.5 14.5,19 0,10.5 -14.5,19 -11,3.5 -22.5,-7 -6.8,-7.5"
+                 fill="#ffc324" opacity="0.95"/>
+    </g>
+
+    <!-- ── SHIELD ── -->
+    <g filter="url(#glow)">
+        <path d="M256 116 C256 116 412 155 412 241 L412 330 Q412 460 256 480 Q100 460 100 330 L100 241 C100 155 256 116 256 116Z"
+              fill="url(#shieldFill)" fill-opacity="0.92"
+              stroke="#00ff87" stroke-width="7" stroke-linejoin="round"/>
+    </g>
+
+    <!-- Top header band -->
+    <path d="M100 241 L100 287 L256 258 L412 287 L412 241Z"
+          fill="#00ff87" fill-opacity="0.07"/>
+    <line x1="100" y1="287" x2="412" y2="287" stroke="#00ff87" stroke-width="3" opacity="0.25"/>
+
+    <!-- Corner accent dots in band -->
+    <circle cx="138" cy="236" r="8" fill="#00ff87" opacity="0.55"/>
+    <circle cx="374" cy="236" r="8" fill="#00ff87" opacity="0.55"/>
+
+    <!-- Diamond ornament top-centre -->
+    <polygon points="256,122 270,152 256,182 242,152"
+             fill="#00ff87" opacity="0.68"/>
+
+    <!-- ── FOOTBALL TEXTURE (behind bars, lower shield) ── -->
+    <circle cx="256" cy="390" r="85"
+            fill="none" stroke="#00ff87" stroke-width="5" opacity="0.09"/>
+    <!-- central pentagon -->
+    <polygon points="256,345 288,366 276,400 236,400 224,366"
+             fill="rgba(0,255,135,0.04)" stroke="#00ff87" stroke-width="3" opacity="0.14"/>
+    <!-- seam lines -->
+    <path d="M256,345 C250,310 228,294 206,280" fill="none" stroke="#00ff87" stroke-width="2.5" opacity="0.10"/>
+    <path d="M288,366 C312,348 338,350 358,340" fill="none" stroke="#00ff87" stroke-width="2.5" opacity="0.10"/>
+    <path d="M276,400 C290,428 276,454 256,468" fill="none" stroke="#00ff87" stroke-width="2.5" opacity="0.10"/>
+    <path d="M236,400 C222,428 236,454 256,468" fill="none" stroke="#00ff87" stroke-width="2.5" opacity="0.10"/>
+    <path d="M224,366 C200,348 174,350 154,340" fill="none" stroke="#00ff87" stroke-width="2.5" opacity="0.10"/>
+
+    <!-- ── DATA BARS (foreground) ── -->
+    <!-- bar 1 (short) -->
+    <rect x="152" y="348" width="52" height="110" rx="10"
+          fill="#00ff87" opacity="0.44"/>
+    <!-- bar 2 (medium) -->
+    <rect x="230" y="292" width="52" height="166" rx="10"
+          fill="#00ff87" opacity="0.72"/>
+    <!-- bar 3 (tall) -->
+    <rect x="308" y="228" width="52" height="230" rx="10"
+          fill="#00ff87"/>
+
+    <!-- Bar top highlights -->
+    <line x1="152" y1="348" x2="204" y2="348" stroke="#fff" stroke-width="3.5" opacity="0.22" stroke-linecap="round"/>
+    <line x1="230" y1="292" x2="282" y2="292" stroke="#fff" stroke-width="3.5" opacity="0.22" stroke-linecap="round"/>
+    <line x1="308" y1="228" x2="360" y2="228" stroke="#fff" stroke-width="3.5" opacity="0.22" stroke-linecap="round"/>
+</svg>

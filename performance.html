@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- PWA / Home screen icon -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <meta name="theme-color" content="#37003c">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="FPL Analyzer">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Performance Analytics - FPL Analyzer</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="theme.js"></script>
+    <script src="lang.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <style>
+        .container {
+            max-width: 1000px;
+        }
+        .card {
+            margin: 20px auto;
+            background: rgba(255, 255, 255, 0.98) !important;
+            border: 2px solid rgba(66, 181, 88, 0.3);
+        }
+        .card-content {
+            max-height: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <button class="back-btn" onclick="window.close()" title="Close" aria-label="Close">←</button>
+            <h1 data-i18n="cardPerformance">Performance Analytics</h1>
+            <div class="lang-switcher">
+                <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English">🇬🇧</button>
+                <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski">🇷🇸</button>
+            </div>
+            <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">🌙</button>
+        </header>
+
+        <div class="card">
+            <div class="card-content" id="performance-content">
+                <div class="loading">Loading performance data...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="fpl-api.js"></script>
+    <script>
+        async function loadPerformance() {
+            const content = document.getElementById('performance-content');
+
+            try {
+                const managerData = await FPL_API.getManagerTeam();
+                const history = await FPL_API.getManagerHistory();
+
+                let html = `
+                    <h3>${managerData.name}</h3>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-card-value">${managerData.summary_overall_points}</div>
+                            <div class="stat-card-label">${t('totalPoints')}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-card-value">${managerData.summary_overall_rank?.toLocaleString()}</div>
+                            <div class="stat-card-label">${t('overallRank')}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-card-value">${managerData.summary_event_points || 0}</div>
+                            <div class="stat-card-label">${t('gwPointsLabel')}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-card-value">${history.current.length}</div>
+                            <div class="stat-card-label">${t('gwsPlayed')}</div>
+                        </div>
+                    </div>
+                `;
+
+                let gwLabels = [];
+                let gwPoints = [];
+                let gwAvgLine = [];
+
+                if (history.current.length > 0) {
+                    // Calculate average points
+                    const avgPoints = Math.round(
+                        history.current.reduce((sum, gw) => sum + gw.points, 0) / history.current.length
+                    );
+
+                    // Find best gameweek
+                    const bestGW = history.current.reduce((max, gw) =>
+                        gw.points > max.points ? gw : max
+                    );
+
+                    // Find worst gameweek
+                    const worstGW = history.current.reduce((min, gw) =>
+                        gw.points < min.points ? gw : min
+                    );
+
+                    html += `
+                        <h3 style="margin-top: 30px; color: var(--primary-color);">${t('seasonStats')}</h3>
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-card-value">${avgPoints}</div>
+                                <div class="stat-card-label">${t('average')}</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-card-value">${bestGW.points}</div>
+                                <div class="stat-card-label">${t('bestGW')} (${bestGW.event})</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-card-value">${worstGW.points}</div>
+                                <div class="stat-card-label">${t('worstGW')} (${worstGW.event})</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-card-value">${history.current.reduce((sum, gw) => sum + gw.event_transfers, 0)}</div>
+                                <div class="stat-card-label">${t('totalTransfers')}</div>
+                            </div>
+                        </div>
+                        <h3 style="margin-top: 30px; color: var(--primary-color);">${t('gwPointsChart')}</h3>
+                        <div style="position:relative; width:100%; height:260px; margin-bottom:20px;">
+                            <canvas id="gw-chart"></canvas>
+                        </div>
+                    `;
+
+                    // Build data arrays for the chart
+                    gwLabels = history.current.map(gw => 'GW ' + gw.event);
+                    gwPoints = history.current.map(gw => gw.points);
+                    gwAvgLine = history.current.map(() => avgPoints);
+
+                    html += `<h3 style="margin-top: 30px; color: var(--primary-color);">${t('gwHistory')}</h3>`;
+                    html += '<div class="fixtures-list">';
+
+                    const allGWs = [...history.current].reverse();
+                    for (const gw of allGWs) {
+                        html += `
+                            <div class="fixture-item">
+                                <span class="fixture-teams"><strong>${t('gameweek')} ${gw.event}</strong></span>
+                                <span><strong>${gw.points} ${t('pts')}</strong></span>
+                                <span>${t('rank')}: ${gw.overall_rank.toLocaleString()}</span>
+                                <span>${t('transfers')}: ${gw.event_transfers}</span>
+                            </div>
+                        `;
+                    }
+
+                    html += '</div>';
+                }
+
+                content.innerHTML = html;
+
+                // Draw the chart after innerHTML is set so the canvas exists in DOM
+                if (history.current.length > 0) {
+                    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+                    const gridColor  = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(55,0,60,0.08)';
+                    const labelColor = isDark ? '#9a88bc' : '#5a5070';
+
+                    const ctx = document.getElementById('gw-chart').getContext('2d');
+                    const lineColor = isDark ? '#00ff87' : '#37003c';
+                    const lineFill  = isDark ? 'rgba(0,255,135,0.10)' : 'rgba(55,0,60,0.08)';
+                    const dotColor  = isDark ? '#00cc6a' : '#37003c';
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: gwLabels,
+                            datasets: [
+                                {
+                                    label: t('gwPointsLabel'),
+                                    data: gwPoints,
+                                    borderColor: lineColor,
+                                    backgroundColor: lineFill,
+                                    borderWidth: 2.5,
+                                    pointRadius: 4,
+                                    pointHoverRadius: 7,
+                                    pointBackgroundColor: gwPoints.map(p =>
+                                        p === Math.max(...gwPoints) ? '#00ff87' :
+                                        p === Math.min(...gwPoints) ? '#ff2882' : dotColor
+                                    ),
+                                    pointBorderColor: '#fff',
+                                    pointBorderWidth: 1.5,
+                                    tension: 0.35,
+                                    fill: true
+                                },
+                                {
+                                    label: t('seasonAvg'),
+                                    data: gwAvgLine,
+                                    borderColor: '#00cc6a',
+                                    borderWidth: 1.5,
+                                    borderDash: [6, 4],
+                                    pointRadius: 0,
+                                    tension: 0,
+                                    fill: false
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: { mode: 'index', intersect: false },
+                            plugins: {
+                                legend: {
+                                    display: true,
+                                    position: 'top',
+                                    labels: {
+                                        color: labelColor,
+                                        font: { size: 12 },
+                                        usePointStyle: true,
+                                        boxWidth: 8
+                                    }
+                                },
+                                tooltip: {
+                                    backgroundColor: isDark ? '#1c1436' : '#37003c',
+                                    titleColor: '#00ff87',
+                                    bodyColor: '#fff',
+                                    borderColor: '#00ff87',
+                                    borderWidth: 1,
+                                    padding: 10,
+                                    callbacks: {
+                                        label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y} pts`
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    grid: { color: gridColor },
+                                    ticks: {
+                                        color: labelColor,
+                                        font: { size: 11 },
+                                        maxRotation: 45
+                                    }
+                                },
+                                y: {
+                                    grid: { color: gridColor },
+                                    ticks: {
+                                        color: labelColor,
+                                        font: { size: 11 }
+                                    },
+                                    title: {
+                                        display: true,
+                                        text: 'Points',
+                                        color: labelColor,
+                                        font: { size: 12 }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            } catch (error) {
+                content.innerHTML = `<div class="loading">${t('errorPerf')}</div>`;
+                console.error(error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadPerformance);
+    </script>
+
+    <footer class="site-footer" data-i18n-html="footerHtml">
+        Made with <span class="heart">&#x2665;</span> for you by <strong>Srdjan Kojic</strong>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- PWA / Home screen icon -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <meta name="theme-color" content="#37003c">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="FPL Analyzer">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Player Comparison - FPL Analyzer</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="theme.js"></script>
+    <script src="lang.js"></script>
+    <style>
+        .container { max-width: 1000px; }
+        .card {
+            margin: 20px auto;
+            background: rgba(255,255,255,0.98) !important;
+            border: 2px solid rgba(66,181,88,0.3);
+        }
+        .card-content { max-height: none; }
+
+        .cmp-page-search {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        @media (max-width: 600px) {
+            .cmp-page-search { grid-template-columns: 1fr; }
+        }
+
+        .cmp-slot {
+            position: relative;
+        }
+        .cmp-slot-label {
+            font-size: 0.78em;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            margin-bottom: 5px;
+        }
+        .cmp-selected-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--primary-color);
+            color: white;
+            border-radius: 8px;
+            padding: 7px 10px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .cmp-selected-badge button {
+            background: none;
+            border: none;
+            color: rgba(255,255,255,0.7);
+            cursor: pointer;
+            font-size: 1em;
+            margin-left: auto;
+            padding: 0;
+            line-height: 1;
+            transition: color 0.15s;
+        }
+        .cmp-selected-badge button:hover { color: #ff2882; }
+        .cmp-selected-meta {
+            font-size: 0.78em;
+            opacity: 0.8;
+        }
+
+        .cmp-full-table-wrap {
+            overflow-x: auto;
+            border-radius: 12px;
+            border: 1.5px solid var(--card-border);
+            margin-top: 8px;
+        }
+        .cmp-full-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 340px;
+            font-size: 0.85em;
+        }
+        .cmp-full-table th {
+            background: var(--primary-color);
+            color: white;
+            padding: 11px 14px;
+            text-align: center;
+            font-weight: 700;
+            white-space: nowrap;
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+        .cmp-full-table th:first-child {
+            text-align: left;
+            min-width: 140px;
+            position: sticky;
+            left: 0;
+            z-index: 6;
+        }
+        .cmp-full-table td {
+            padding: 9px 14px;
+            text-align: center;
+            border-bottom: 1px solid var(--divider);
+            white-space: nowrap;
+        }
+        .cmp-full-table td:first-child {
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-muted);
+            background: var(--card-bg, #fff);
+            position: sticky;
+            left: 0;
+            z-index: 2;
+            border-right: 1px solid var(--divider);
+        }
+        .cmp-full-table tbody tr:nth-child(even) { background: rgba(55,0,60,0.025); }
+        [data-theme="dark"] .cmp-full-table tbody tr:nth-child(even) { background: rgba(255,255,255,0.03); }
+        .cmp-full-table tbody tr:last-child td { border-bottom: none; }
+
+        .cmp-section-header td {
+            background: rgba(55,0,60,0.07) !important;
+            color: var(--primary-color) !important;
+            font-weight: 700 !important;
+            font-size: 0.82em !important;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 6px 14px !important;
+            border-top: 1px solid var(--divider);
+        }
+        [data-theme="dark"] .cmp-section-header td {
+            background: rgba(0,255,135,0.06) !important;
+            color: var(--secondary-color) !important;
+        }
+
+        .stat-badge-best {
+            display: inline-block;
+            background: rgba(0,204,106,0.18);
+            color: #15803d;
+            font-weight: 700;
+            border-radius: 5px;
+            padding: 2px 8px;
+        }
+        .stat-badge-worst {
+            display: inline-block;
+            background: rgba(255,40,130,0.13);
+            color: #be185d;
+            font-weight: 700;
+            border-radius: 5px;
+            padding: 2px 8px;
+        }
+        [data-theme="dark"] .stat-badge-best  { color: #4ade80; }
+        [data-theme="dark"] .stat-badge-worst { color: #f472b6; }
+
+        .no-selection {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+            font-size: 0.9em;
+        }
+        .no-selection .big-icon { font-size: 2.5em; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <button class="back-btn" onclick="window.close()" title="Close" aria-label="Close">&#x2190;</button>
+            <h1 data-i18n="cardComparison">Player Comparison</h1>
+            <div class="lang-switcher">
+                <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English">🇬🇧</button>
+                <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski">🇷🇸</button>
+            </div>
+            <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">🌙</button>
+        </header>
+
+        <div class="card">
+            <div class="card-content">
+                <!-- Search row -->
+                <div class="cmp-page-search" id="cmp-page-search">
+                    <div class="cmp-slot" id="slot-0">
+                        <div class="cmp-slot-label">Player 1</div>
+                        <input type="text" class="compare-input" id="page-input-0"
+                               placeholder="Search player..." autocomplete="off"
+                               oninput="pageSearch(0)" />
+                        <div class="cmp-dropdown" id="page-dd-0"></div>
+                    </div>
+                    <div class="cmp-slot" id="slot-1">
+                        <div class="cmp-slot-label">Player 2</div>
+                        <input type="text" class="compare-input" id="page-input-1"
+                               placeholder="Search player..." autocomplete="off"
+                               oninput="pageSearch(1)" />
+                        <div class="cmp-dropdown" id="page-dd-1"></div>
+                    </div>
+                    <div class="cmp-slot" id="slot-2">
+                        <div class="cmp-slot-label">Player 3 <span style="opacity:0.5;">(optional)</span></div>
+                        <input type="text" class="compare-input" id="page-input-2"
+                               placeholder="Search player..." autocomplete="off"
+                               oninput="pageSearch(2)" />
+                        <div class="cmp-dropdown" id="page-dd-2"></div>
+                    </div>
+                </div>
+
+                <!-- Result -->
+                <div id="page-cmp-result">
+                    <div class="no-selection">
+                        <div class="big-icon">⚽</div>
+                        Search and select at least 2 players to compare their FPL stats side-by-side.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="site-footer" data-i18n-html="footerHtml">
+        Made with <span class="heart">&#x2665;</span> for you by <strong>Srdjan Kojic</strong>
+    </footer>
+
+    <script src="fpl-api.js"></script>
+    <script>
+        let allPlayers = [];
+        const pageState = { players: [null, null, null] };
+
+        // ── Stats definition ──────────────────────────────────────────────────
+        // [key, label, section, higherIsBetter (null = informational only)]
+        const PAGE_STATS = [
+            // FPL Basics
+            ['price',                       'Price (£m)',            'FPL Basics',       false],
+            ['points',                       'Total Points',          'FPL Basics',       true],
+            ['form',                         'Form (last 5 GW)',      'FPL Basics',       true],
+            ['pointsPerGame',                'Points / Game',         'FPL Basics',       true],
+            ['minutes',                      'Minutes Played',        'FPL Basics',       true],
+            ['starts',                       'Starts',                'FPL Basics',       true],
+            ['selectedBy',                   'Selected By %',         'FPL Basics',       null],
+            // Attacking
+            ['goalsScored',                  'Goals',                 'Attacking',        true],
+            ['assists',                      'Assists',               'Attacking',        true],
+            ['expectedGoals',                'xG',                    'Attacking',        true],
+            ['expectedAssists',              'xA',                    'Attacking',        true],
+            ['expectedGoalInvolvements',     'xGI (xG + xA)',         'Attacking',        true],
+            ['expectedGoalsPer90',           'xG / 90',               'Attacking',        true],
+            ['expectedGoalInvolvementsPer90','xGI / 90',              'Attacking',        true],
+            // Defensive
+            ['cleanSheets',                  'Clean Sheets',          'Defensive',        true],
+            ['goalsConceded',                'Goals Conceded',        'Defensive',        false],
+            ['expectedGoalsConceded',        'xGC',                   'Defensive',        false],
+            ['expectedGoalsConcededPer90',   'xGC / 90',              'Defensive',        false],
+            ['saves',                        'Saves',                 'Defensive',        true],
+            ['savesPer90',                   'Saves / 90',            'Defensive',        true],
+            // Discipline
+            ['yellowCards',                  'Yellow Cards',          'Discipline',       false],
+            ['redCards',                     'Red Cards',             'Discipline',       false],
+            ['ownGoals',                     'Own Goals',             'Discipline',       false],
+            ['penaltiesMissed',              'Penalties Missed',      'Discipline',       false],
+            // Advanced
+            ['bonus',                        'Bonus Points',          'Advanced',         true],
+            ['bps',                          'BPS Score',             'Advanced',         true],
+            ['influence',                    'Influence',             'Advanced',         true],
+            ['creativity',                   'Creativity',            'Advanced',         true],
+            ['threat',                       'Threat',                'Advanced',         true],
+            ['ictIndex',                     'ICT Index',             'Advanced',         true],
+        ];
+
+        const DECIMAL_KEYS = new Set(['price','form','pointsPerGame','expectedGoals','expectedAssists',
+            'expectedGoalInvolvements','expectedGoalsPer90','expectedGoalInvolvementsPer90',
+            'expectedGoalsConceded','expectedGoalsConcededPer90','savesPer90',
+            'influence','creativity','threat','ictIndex','selectedBy','bps']);
+
+        function fmt(key, val) {
+            const v = parseFloat(val) || 0;
+            const d = DECIMAL_KEYS.has(key) ? 1 : 0;
+            const s = v.toFixed(d);
+            if (key === 'price') return '£' + s + 'm';
+            if (key === 'selectedBy') return s + '%';
+            return s;
+        }
+
+        // ── Search & select ───────────────────────────────────────────────────
+        function pageSearch(idx) {
+            const input = document.getElementById(`page-input-${idx}`);
+            const dd    = document.getElementById(`page-dd-${idx}`);
+            const q     = (input.value || '').trim().toLowerCase();
+
+            if (q.length < 2) { dd.innerHTML = ''; dd.classList.remove('open'); return; }
+
+            const matches = allPlayers
+                .filter(p => p.name.toLowerCase().includes(q) ||
+                             (p.fullName || '').toLowerCase().includes(q))
+                .slice(0, 10);
+
+            if (!matches.length) {
+                dd.innerHTML = '<div class="cmp-dropdown-item" style="color:var(--text-muted)">No players found</div>';
+            } else {
+                dd.innerHTML = matches.map(p =>
+                    `<div class="cmp-dropdown-item" onclick="pageSelect(${idx},'${p.id}')">
+                        <strong>${p.name}</strong>
+                        <span>${p.team} · ${p.position} · £${(parseFloat(p.price)||0).toFixed(1)}m · ${(parseFloat(p.points)||0)} pts</span>
+                    </div>`
+                ).join('');
+            }
+            dd.classList.add('open');
+        }
+
+        function pageSelect(idx, playerId) {
+            const player = allPlayers.find(p => String(p.id) === String(playerId));
+            if (!player) return;
+            pageState.players[idx] = player;
+
+            // Show selected badge
+            const slot  = document.getElementById(`slot-${idx}`);
+            const input = document.getElementById(`page-input-${idx}`);
+            const dd    = document.getElementById(`page-dd-${idx}`);
+
+            input.style.display = 'none';
+            dd.innerHTML = ''; dd.classList.remove('open');
+
+            // Remove old badge if exists
+            const old = slot.querySelector('.cmp-selected-badge');
+            if (old) old.remove();
+
+            const badge = document.createElement('div');
+            badge.className = 'cmp-selected-badge';
+            badge.innerHTML = `
+                <div>
+                    <div>${player.name}</div>
+                    <div class="cmp-selected-meta">${player.team} · ${player.position} · £${(parseFloat(player.price)||0).toFixed(1)}m</div>
+                </div>
+                <button onclick="pageRemove(${idx})" title="Remove player">✕</button>
+            `;
+            slot.appendChild(badge);
+
+            renderPageTable();
+        }
+
+        function pageRemove(idx) {
+            pageState.players[idx] = null;
+            const slot  = document.getElementById(`slot-${idx}`);
+            const input = document.getElementById(`page-input-${idx}`);
+            const badge = slot.querySelector('.cmp-selected-badge');
+            if (badge) badge.remove();
+            input.value = '';
+            input.style.display = '';
+            renderPageTable();
+        }
+
+        // ── Render comparison table ───────────────────────────────────────────
+        function renderPageTable() {
+            const result = document.getElementById('page-cmp-result');
+            const active = pageState.players.filter(Boolean);
+
+            if (active.length < 2) {
+                result.innerHTML = `<div class="no-selection"><div class="big-icon">📊</div>Select at least 2 players above to see the comparison.</div>`;
+                return;
+            }
+
+            // Header
+            let thead = '<tr><th>Stat</th>';
+            pageState.players.forEach((p, i) => {
+                if (!p) return;
+                thead += `<th>
+                    <div class="cmp-player-header">
+                        <div class="cmp-player-name">${p.name}</div>
+                        <div class="cmp-player-meta">${p.team} · ${p.position}</div>
+                    </div>
+                </th>`;
+            });
+            thead += '</tr>';
+
+            // Body grouped by section
+            let lastSection = '';
+            let tbody = '';
+            for (const [key, label, section, higherBetter] of PAGE_STATS) {
+                // Section header row
+                if (section !== lastSection) {
+                    const span = active.length + 1;
+                    tbody += `<tr class="cmp-section-header"><td colspan="${span}">${section}</td></tr>`;
+                    lastSection = section;
+                }
+
+                const vals = pageState.players.filter(Boolean).map(p => parseFloat(p[key]) || 0);
+                const maxVal  = Math.max(...vals);
+                const minVal  = Math.min(...vals);
+                const allSame = maxVal === minVal;
+
+                let row = `<tr><td>${label}</td>`;
+                pageState.players.forEach(p => {
+                    if (!p) return;
+                    const v = parseFloat(p[key]) || 0;
+                    const display = fmt(key, v);
+                    let cls = '';
+                    if (!allSame && higherBetter !== null) {
+                        if (higherBetter  && v === maxVal) cls = 'stat-badge-best';
+                        if (higherBetter  && v === minVal) cls = 'stat-badge-worst';
+                        if (!higherBetter && v === minVal) cls = 'stat-badge-best';
+                        if (!higherBetter && v === maxVal) cls = 'stat-badge-worst';
+                    }
+                    row += `<td>${cls ? `<span class="${cls}">${display}</span>` : display}</td>`;
+                });
+                row += '</tr>';
+                tbody += row;
+            }
+
+            result.innerHTML = `
+                <div class="cmp-full-table-wrap">
+                    <table class="cmp-full-table">
+                        <thead>${thead}</thead>
+                        <tbody>${tbody}</tbody>
+                    </table>
+                </div>
+                <p style="font-size:0.78em; color:var(--text-muted); margin-top:8px; text-align:center;">
+                    <span style="display:inline-block; background:rgba(0,204,106,0.18); color:#15803d; border-radius:4px; padding:1px 7px; margin-right:6px; font-weight:700;">Green = best</span>
+                    <span style="display:inline-block; background:rgba(255,40,130,0.13); color:#be185d; border-radius:4px; padding:1px 7px; font-weight:700;">Red = worst</span>
+                    &nbsp;(where applicable)
+                </p>`;
+        }
+
+        // ── Close dropdowns on outside click ─────────────────────────────────
+        document.addEventListener('click', e => {
+            if (!e.target.closest('.cmp-slot')) {
+                document.querySelectorAll('.cmp-dropdown').forEach(d => d.classList.remove('open'));
+            }
+        });
+
+        // ── Load players ──────────────────────────────────────────────────────
+        async function init() {
+            try {
+                const data = await FPL_API.getAllPlayers();
+                allPlayers = data || [];
+            } catch (e) {
+                document.getElementById('page-cmp-result').innerHTML =
+                    '<div class="no-selection">Failed to load player data.</div>';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- PWA / Home screen icon -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <meta name="theme-color" content="#37003c">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="FPL Analyzer">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Player Profile — FPL</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="theme.js"></script>
+    <script src="lang.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <style>
+        /* ── Player page specific styles ── */
+        .player-hero {
+            background-image: url('https://images.pexels.com/photos/46798/the-ball-stadion-football-the-pitch-46798.jpeg?auto=compress&cs=tinysrgb&w=1920');
+            background-size: cover;
+            background-position: center 40%;
+            border-radius: 16px;
+            margin-bottom: 28px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(55,0,60,0.45);
+            border-bottom: 4px solid var(--secondary-color);
+        }
+        .player-hero::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(160deg,
+                rgba(55,0,60,0.88) 0%,
+                rgba(20,0,40,0.92) 55%,
+                rgba(0,80,40,0.60) 100%);
+            z-index: 0;
+        }
+        .player-hero-inner {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            gap: 28px;
+            padding: 36px 40px 32px;
+        }
+        .player-photo-wrap {
+            flex-shrink: 0;
+            width: 110px;
+            height: 110px;
+            border-radius: 50%;
+            border: 3px solid var(--secondary-color);
+            overflow: hidden;
+            background: rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 0 4px rgba(0,255,135,0.2);
+            position: relative;
+        }
+        .player-photo-wrap img {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: top center;
+        }
+        .player-photo-fallback {
+            font-family: 'Oswald', sans-serif;
+            font-size: 2.2em;
+            font-weight: 700;
+            color: var(--secondary-color);
+        }
+        .player-hero-text {
+            flex: 1;
+            min-width: 0;
+        }
+        .player-hero-eyebrow {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.72em;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: var(--secondary-color);
+            margin-bottom: 6px;
+            display: block;
+        }
+        .player-hero-name {
+            font-family: 'Oswald', sans-serif;
+            font-size: 2.8em;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #fff;
+            line-height: 1.05;
+            margin: 0 0 10px;
+            text-shadow: 2px 4px 8px rgba(0,0,0,0.85), 0 1px 2px rgba(0,0,0,0.9);
+        }
+        .player-hero-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+        .player-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+        }
+        .badge-pos  { background: var(--secondary-color); color: #0d0818; }
+        .badge-team { background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.3); }
+        .badge-price { background: rgba(0,255,135,0.15); color: var(--secondary-color); border: 1px solid rgba(0,255,135,0.3); }
+        .badge-status-a { background: rgba(34,197,94,0.2); color: #4ade80; border: 1px solid rgba(34,197,94,0.4); }
+        .badge-status-d { background: rgba(234,179,8,0.2); color: #facc15; border: 1px solid rgba(234,179,8,0.4); }
+        .badge-status-i { background: rgba(239,68,68,0.2); color: #f87171; border: 1px solid rgba(239,68,68,0.4); }
+        .badge-status-s { background: rgba(107,114,128,0.2); color: #9ca3af; border: 1px solid rgba(107,114,128,0.4); }
+        .badge-status-u { background: rgba(107,114,128,0.2); color: #9ca3af; border: 1px solid rgba(107,114,128,0.4); }
+        .player-news-strip {
+            margin-top: 10px;
+            font-size: 0.78em;
+            color: rgba(255,255,255,0.7);
+            font-style: italic;
+        }
+
+        /* ── Section cards ── */
+        .pp-section {
+            background: var(--card-bg);
+            border-radius: 14px;
+            padding: 22px 24px;
+            margin-bottom: 22px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+        }
+        .pp-section-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1em;
+            font-weight: 600;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--secondary-color);
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .pp-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 12px;
+        }
+        .pp-stat {
+            background: var(--bg-color);
+            border-radius: 10px;
+            padding: 12px 10px;
+            text-align: center;
+            border: 1px solid var(--border-color);
+            transition: transform 0.15s;
+        }
+        .pp-stat:hover { transform: translateY(-2px); }
+        .pp-stat-value {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.7em;
+            font-weight: 700;
+            color: var(--secondary-color);
+            line-height: 1.1;
+        }
+        .pp-stat-label {
+            font-size: 0.68em;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-top: 4px;
+        }
+        .pp-stat-sub {
+            font-size: 0.72em;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* ── Chart container ── */
+        .pp-chart-wrap {
+            position: relative;
+            width: 100%;
+            height: 220px;
+        }
+
+        /* ── Fixtures ── */
+        .fixture-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .fixture-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            border-radius: 10px;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            font-size: 0.88em;
+        }
+        .fixture-gw {
+            font-weight: 700;
+            color: var(--text-muted);
+            width: 30px;
+            flex-shrink: 0;
+            font-size: 0.78em;
+        }
+        .fixture-ha {
+            font-size: 0.72em;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+        .fixture-ha.home { background: rgba(0,255,135,0.15); color: var(--secondary-color); }
+        .fixture-ha.away { background: rgba(255,255,255,0.08); color: var(--text-muted); }
+        .fixture-opp { flex: 1; font-weight: 600; color: var(--text-color); }
+        .fixture-date { font-size: 0.75em; color: var(--text-muted); }
+        .fdr-badge {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.78em;
+            flex-shrink: 0;
+        }
+        .fdr-1 { background:#00ff87; color:#0d0818; }
+        .fdr-2 { background:#00cc6a; color:#0d0818; }
+        .fdr-3 { background:#e8c000; color:#1a1a1a; }
+        .fdr-4 { background:#e05b00; color:#fff; }
+        .fdr-5 { background:#cc0000; color:#fff; }
+
+        /* ── GW history table ── */
+        .gw-table { width: 100%; border-collapse: collapse; font-size: 0.83em; }
+        .gw-table th {
+            text-align: left;
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.75em;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            padding: 6px 8px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .gw-table td { padding: 6px 8px; border-bottom: 1px solid var(--border-color); color: var(--text-color); }
+        .gw-table tr:last-child td { border-bottom: none; }
+        .gw-pts-high { color: var(--secondary-color); font-weight: 700; }
+        .gw-pts-med  { color: var(--text-color); font-weight: 600; }
+        .gw-pts-low  { color: var(--text-muted); }
+
+        /* ── ICT bar ── */
+        .ict-bars { display: flex; flex-direction: column; gap: 10px; }
+        .ict-row { display: flex; align-items: center; gap: 10px; }
+        .ict-label { width: 90px; font-size: 0.8em; color: var(--text-muted); flex-shrink: 0; }
+        .ict-track { flex: 1; height: 10px; border-radius: 5px; background: var(--bg-color); overflow: hidden; border: 1px solid var(--border-color); }
+        .ict-fill { height: 100%; border-radius: 5px; transition: width 0.6s ease; }
+        .ict-val { width: 46px; text-align: right; font-size: 0.82em; font-weight: 700; color: var(--text-color); flex-shrink: 0; }
+        .fill-inf  { background: linear-gradient(90deg,#7c3aed,#a855f7); }
+        .fill-cre  { background: linear-gradient(90deg,#0891b2,#06b6d4); }
+        .fill-thr  { background: linear-gradient(90deg,#b91c1c,#ef4444); }
+        .fill-ict  { background: linear-gradient(90deg,#00ff87,#00cc6a); }
+
+        /* ── Back button row ── */
+        .pp-back { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+        .back-btn {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background 0.2s;
+        }
+        .back-btn:hover { background: var(--border-color); }
+
+        /* ── Loading/error ── */
+        .pp-loading {
+            text-align: center;
+            padding: 80px 20px;
+            color: var(--text-muted);
+            font-size: 1.1em;
+        }
+        .pp-spinner {
+            width: 40px; height: 40px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--secondary-color);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Responsive ── */
+        @media (max-width: 768px) {
+            .player-hero-inner { flex-direction: column; align-items: flex-start; padding: 56px 20px 24px; gap: 16px; }
+            .player-hero-name { font-size: 2em; }
+            .pp-stats-grid { grid-template-columns: repeat(3, 1fr); }
+            .pp-section { padding: 16px; }
+        }
+        @media (max-width: 480px) {
+            .player-hero-name { font-size: 1.5em; }
+            .player-photo-wrap { width: 80px; height: 80px; }
+            .pp-stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .pp-chart-wrap { height: 180px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container" style="max-width:900px;">
+
+        <div class="pp-back">
+            <button class="back-btn" onclick="window.close(); history.back();">← Back</button>
+            <div class="lang-switcher" style="position:static;display:inline-flex;vertical-align:middle;margin-right:6px;">
+                <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English">🇬🇧</button>
+                <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski">🇷🇸</button>
+            </div>
+            <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">🌙</button>
+        </div>
+
+        <div id="pp-root">
+            <div class="pp-loading">
+                <div class="pp-spinner"></div>
+                Loading player data…
+            </div>
+        </div>
+
+    </div>
+
+    <footer class="site-footer" data-i18n-html="footerHtml">
+        Made with <span class="heart">♥</span> for you by <strong>Srdjan Kojic</strong>
+        <span class="footer-sep">|</span>
+        FPL Analyzer &bull; 2025/26
+    </footer>
+
+    <script src="fpl-api.js"></script>
+    <script>
+    (async function () {
+        const root = document.getElementById('pp-root');
+
+        // ── helpers ────────────────────────────────────────────
+        function safeNum(v, d = 0) {
+            const n = parseFloat(v);
+            return isNaN(n) ? (d > 0 ? (0).toFixed(d) : 0) : (d > 0 ? n.toFixed(d) : Math.round(n));
+        }
+
+        function initials(name) {
+            if (!name) return '??';
+            const parts = name.split(' ');
+            return (parts[0][0] + (parts[parts.length - 1][0] || '')).toUpperCase();
+        }
+
+        function statusBadge(status, chance) {
+            const labels = { a: 'Available', d: 'Doubtful', i: 'Injured', s: 'Suspended', u: 'Unavailable' };
+            const cls    = { a: 'badge-status-a', d: 'badge-status-d', i: 'badge-status-i', s: 'badge-status-s', u: 'badge-status-u' };
+            const icons  = { a: '✓', d: '?', i: '✖', s: '⛔', u: '—' };
+            const pct = (chance != null && status !== 'a') ? ` (${chance}%)` : '';
+            return `<span class="player-badge ${cls[status] || 'badge-status-u'}">${icons[status] || '—'} ${labels[status] || status}${pct}</span>`;
+        }
+
+        function priceChangeStr(change) {
+            if (!change || change === 0) return '';
+            const sign = change > 0 ? '+' : '';
+            return `${sign}${(change / 10).toFixed(1)}m since start`;
+        }
+
+        function formatDate(iso) {
+            if (!iso) return '';
+            const d = new Date(iso);
+            return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+        }
+
+        // ── get player ID from URL ──────────────────────────────
+        const params = new URLSearchParams(location.search);
+        const playerId = parseInt(params.get('id'));
+
+        if (!playerId) {
+            root.innerHTML = `<div class="pp-loading">No player ID specified in URL.<br><small>Use <code>player.html?id=123</code></small></div>`;
+            return;
+        }
+
+        try {
+            // ── load data in parallel ───────────────────────────
+            const [allPlayers, playerDetail, bootstrap, fixtures] = await Promise.all([
+                FPL_API.getAllPlayers(),
+                FPL_API.getPlayerDetails(playerId),
+                FPL_API.getBootstrapStatic(),
+                FPL_API.getFixtures()
+            ]);
+
+            const p = allPlayers.find(x => x.id === playerId);
+            if (!p) { root.innerHTML = `<div class="pp-loading">Player not found.</div>`; return; }
+
+            document.title = `${p.name} – FPL Profile`;
+
+            // ── photo ───────────────────────────────────────────
+            const photoCode = p.photo ? p.photo.replace(/\.jpg$/i, '') : null;
+            const photoUrl  = photoCode
+                ? `https://resources.premierleague.com/premierleague/photos/players/250x250/p${photoCode}.png`
+                : null;
+
+            // ── upcoming fixtures ───────────────────────────────
+            const upcoming = FPL_API.getUpcomingFixtures(p.teamId, fixtures, 5);
+            const fixtureRows = upcoming.map(f => {
+                const isHome  = f.team_h === p.teamId;
+                const oppId   = isHome ? f.team_a : f.team_h;
+                const diff    = isHome ? f.team_h_difficulty : f.team_a_difficulty;
+                const opp     = bootstrap.teams.find(tm => tm.id === oppId);
+                const gw      = f.event;
+                return { opp: opp ? opp.short_name : '?', isHome, diff, date: f.kickoff_time, gw };
+            });
+
+            // ── GW history (element-summary fixture data) ───────
+            const gwHistory = (playerDetail.history || []).slice(-10).reverse();
+
+            // ── ICT max for bar scaling ─────────────────────────
+            const ictMax = { inf: 1200, cre: 1200, thr: 1200, ict: 400 };
+            function ictPct(val, key) { return Math.min(100, (val / ictMax[key]) * 100).toFixed(1); }
+
+            // ── build HTML ──────────────────────────────────────
+            const html = `
+                <!-- HERO -->
+                <div class="player-hero">
+                    <div class="player-hero-inner">
+                        <div class="player-photo-wrap">
+                            <span class="player-photo-fallback" id="photo-fallback-${p.id}">${initials(p.fullName)}</span>
+                            ${photoUrl
+                                ? `<img src="${photoUrl}" alt="${p.fullName}" referrerpolicy="no-referrer"
+                                        style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top center;opacity:0;transition:opacity .3s;"
+                                        onload="this.style.opacity=1;var fb=document.getElementById('photo-fallback-${p.id}');if(fb)fb.style.display='none';"
+                                        onerror="this.style.display='none';">`
+                                : ''
+                            }
+                        </div>
+                        <div class="player-hero-text">
+                            <span class="player-hero-eyebrow">Player Profile</span>
+                            <h1 class="player-hero-name">${p.fullName}</h1>
+                            <div class="player-hero-meta">
+                                <span class="player-badge badge-pos">${p.position}</span>
+                                <span class="player-badge badge-team">${p.team}</span>
+                                <span class="player-badge badge-price">£${safeNum(p.price, 1)}m</span>
+                                ${statusBadge(p.status, p.chanceOfPlayingNextRound)}
+                            </div>
+                            ${p.news ? `<div class="player-news-strip">📰 ${p.news}</div>` : ''}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FPL CORE -->
+                <div class="pp-section">
+                    <div class="pp-section-title">FPL Overview</div>
+                    <div class="pp-stats-grid">
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.points)}</div>
+                            <div class="pp-stat-label">Total Points</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.form, 1)}</div>
+                            <div class="pp-stat-label">Form</div>
+                            <div class="pp-stat-sub">Last 5 GW avg</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.pointsPerGame, 1)}</div>
+                            <div class="pp-stat-label">Pts / Game</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.minutes)}</div>
+                            <div class="pp-stat-label">Minutes</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.starts)}</div>
+                            <div class="pp-stat-label">Starts</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.selectedBy, 1)}%</div>
+                            <div class="pp-stat-label">Owned By</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.bonus)}</div>
+                            <div class="pp-stat-label">Bonus Pts</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.bps)}</div>
+                            <div class="pp-stat-label">BPS</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ATTACKING -->
+                <div class="pp-section">
+                    <div class="pp-section-title">Attacking</div>
+                    <div class="pp-stats-grid">
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.goalsScored)}</div>
+                            <div class="pp-stat-label">Goals</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.assists)}</div>
+                            <div class="pp-stat-label">Assists</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.expectedGoals, 2)}</div>
+                            <div class="pp-stat-label">xG</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.expectedAssists, 2)}</div>
+                            <div class="pp-stat-label">xA</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.expectedGoalInvolvements, 2)}</div>
+                            <div class="pp-stat-label">xGI</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.expectedGoalsPer90, 2)}</div>
+                            <div class="pp-stat-label">xG / 90</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.expectedAssistsPer90, 2)}</div>
+                            <div class="pp-stat-label">xA / 90</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.expectedGoalInvolvementsPer90, 2)}</div>
+                            <div class="pp-stat-label">xGI / 90</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DEFENSIVE / GK -->
+                <div class="pp-section">
+                    <div class="pp-section-title">Defensive &amp; Goalkeeping</div>
+                    <div class="pp-stats-grid">
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.cleanSheets)}</div>
+                            <div class="pp-stat-label">Clean Sheets</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.goalsConceded)}</div>
+                            <div class="pp-stat-label">Goals Conceded</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.expectedGoalsConceded, 2)}</div>
+                            <div class="pp-stat-label">xGC</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.expectedGoalsConcededPer90, 2)}</div>
+                            <div class="pp-stat-label">xGC / 90</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.saves)}</div>
+                            <div class="pp-stat-label">Saves</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.savesPer90, 2)}</div>
+                            <div class="pp-stat-label">Saves / 90</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.penaltiesSaved)}</div>
+                            <div class="pp-stat-label">Pens Saved</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.ownGoals)}</div>
+                            <div class="pp-stat-label">Own Goals</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DISCIPLINE & PENALTIES -->
+                <div class="pp-section">
+                    <div class="pp-section-title">Discipline &amp; Set Pieces</div>
+                    <div class="pp-stats-grid">
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.yellowCards)}</div>
+                            <div class="pp-stat-label">Yellow Cards</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.redCards)}</div>
+                            <div class="pp-stat-label">Red Cards</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.penaltiesMissed)}</div>
+                            <div class="pp-stat-label">Pens Missed</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${p.penaltiesOrder != null ? '#' + p.penaltiesOrder : '—'}</div>
+                            <div class="pp-stat-label">Pen Taker Order</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${p.directFreekicksOrder != null ? '#' + p.directFreekicksOrder : '—'}</div>
+                            <div class="pp-stat-label">FK Taker Order</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${p.cornersAndIndirectFreekicksOrder != null ? '#' + p.cornersAndIndirectFreekicksOrder : '—'}</div>
+                            <div class="pp-stat-label">Corner Order</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ICT INDEX -->
+                <div class="pp-section">
+                    <div class="pp-section-title">ICT Index</div>
+                    <div class="ict-bars">
+                        <div class="ict-row">
+                            <span class="ict-label">Influence</span>
+                            <div class="ict-track"><div class="ict-fill fill-inf" style="width:${ictPct(p.influence,'inf')}%"></div></div>
+                            <span class="ict-val">${safeNum(p.influence, 1)}</span>
+                        </div>
+                        <div class="ict-row">
+                            <span class="ict-label">Creativity</span>
+                            <div class="ict-track"><div class="ict-fill fill-cre" style="width:${ictPct(p.creativity,'cre')}%"></div></div>
+                            <span class="ict-val">${safeNum(p.creativity, 1)}</span>
+                        </div>
+                        <div class="ict-row">
+                            <span class="ict-label">Threat</span>
+                            <div class="ict-track"><div class="ict-fill fill-thr" style="width:${ictPct(p.threat,'thr')}%"></div></div>
+                            <span class="ict-val">${safeNum(p.threat, 1)}</span>
+                        </div>
+                        <div class="ict-row">
+                            <span class="ict-label">ICT Index</span>
+                            <div class="ict-track"><div class="ict-fill fill-ict" style="width:${ictPct(p.ictIndex,'ict')}%"></div></div>
+                            <span class="ict-val">${safeNum(p.ictIndex, 1)}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VALUE & TRANSFERS -->
+                <div class="pp-section">
+                    <div class="pp-section-title">Value &amp; Transfers</div>
+                    <div class="pp-stats-grid">
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">£${safeNum(p.price, 1)}m</div>
+                            <div class="pp-stat-label">Price</div>
+                            <div class="pp-stat-sub">${priceChangeStr(p.costChangeStart) || 'No change'}</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.valueForm, 1)}</div>
+                            <div class="pp-stat-label">Value (Form)</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${safeNum(p.valueSeason, 1)}</div>
+                            <div class="pp-stat-label">Value (Season)</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${(p.transfersInEvent || 0).toLocaleString()}</div>
+                            <div class="pp-stat-label">GW Transfers In</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${(p.transfersOutEvent || 0).toLocaleString()}</div>
+                            <div class="pp-stat-label">GW Transfers Out</div>
+                        </div>
+                        <div class="pp-stat">
+                            <div class="pp-stat-value">${(p.transfersIn || 0).toLocaleString()}</div>
+                            <div class="pp-stat-label">Season In</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GW POINTS CHART -->
+                <div class="pp-section">
+                    <div class="pp-section-title">Recent Gameweek Points</div>
+                    <div class="pp-chart-wrap"><canvas id="gw-chart"></canvas></div>
+                </div>
+
+                <!-- GW HISTORY TABLE -->
+                ${gwHistory.length > 0 ? `
+                <div class="pp-section">
+                    <div class="pp-section-title">Last 10 Gameweeks</div>
+                    <div style="overflow-x:auto;">
+                        <table class="gw-table">
+                            <thead>
+                                <tr>
+                                    <th>GW</th>
+                                    <th>Opponent</th>
+                                    <th>H/A</th>
+                                    <th>Score</th>
+                                    <th>Mins</th>
+                                    <th>G</th>
+                                    <th>A</th>
+                                    <th>CS</th>
+                                    <th>Yel</th>
+                                    <th>Pts</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${gwHistory.map(gw => {
+                                    const oppTeam = bootstrap.teams.find(tm => tm.id === (gw.was_home ? gw.opponent_team : gw.opponent_team));
+                                    const oppName = oppTeam ? oppTeam.short_name : gw.opponent_team;
+                                    const ptsClass = gw.total_points >= 9 ? 'gw-pts-high' : gw.total_points >= 6 ? 'gw-pts-med' : 'gw-pts-low';
+                                    const score = gw.team_h_score != null ? `${gw.team_h_score}–${gw.team_a_score}` : '–';
+                                    return `<tr>
+                                        <td>GW${gw.round}</td>
+                                        <td>${oppName}</td>
+                                        <td>${gw.was_home ? 'H' : 'A'}</td>
+                                        <td>${score}</td>
+                                        <td>${gw.minutes}</td>
+                                        <td>${gw.goals_scored}</td>
+                                        <td>${gw.assists}</td>
+                                        <td>${gw.clean_sheets}</td>
+                                        <td>${gw.yellow_cards}</td>
+                                        <td class="${ptsClass}"><strong>${gw.total_points}</strong></td>
+                                    </tr>`;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>` : ''}
+
+                <!-- UPCOMING FIXTURES -->
+                ${fixtureRows.length > 0 ? `
+                <div class="pp-section">
+                    <div class="pp-section-title">Upcoming Fixtures</div>
+                    <div class="fixture-list">
+                        ${fixtureRows.map(f => `
+                            <div class="fixture-row">
+                                <span class="fixture-gw">GW${f.gw}</span>
+                                <span class="fixture-ha ${f.isHome ? 'home' : 'away'}">${f.isHome ? 'H' : 'A'}</span>
+                                <span class="fixture-opp">${f.opp}</span>
+                                <span class="fixture-date">${formatDate(f.date)}</span>
+                                <span class="fdr-badge fdr-${f.diff}">${f.diff}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>` : ''}
+            `;
+
+            root.innerHTML = html;
+
+            // ── GW Chart ────────────────────────────────────────
+            const allHistory = playerDetail.history || [];
+            if (allHistory.length > 0) {
+                const recent = allHistory.slice(-20);
+                const labels = recent.map(g => `GW${g.round}`);
+                const pts    = recent.map(g => g.total_points);
+                const avg    = pts.reduce((a, b) => a + b, 0) / pts.length;
+                const avgLine = pts.map(() => parseFloat(avg.toFixed(1)));
+
+                const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+                const gridColor  = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)';
+                const labelColor = isDark ? '#9a88bc' : '#666';
+
+                new Chart(document.getElementById('gw-chart'), {
+                    type: 'bar',
+                    data: {
+                        labels,
+                        datasets: [
+                            {
+                                label: 'Points',
+                                data: pts,
+                                backgroundColor: pts.map(v =>
+                                    v >= 9 ? 'rgba(0,255,135,0.75)' :
+                                    v >= 6 ? 'rgba(0,200,100,0.6)' :
+                                    v >= 2 ? 'rgba(100,100,200,0.5)' :
+                                    'rgba(220,50,80,0.45)'
+                                ),
+                                borderColor: pts.map(v =>
+                                    v >= 9 ? '#00ff87' :
+                                    v >= 6 ? '#00c864' :
+                                    v >= 2 ? '#6464c8' :
+                                    '#dc3250'
+                                ),
+                                borderWidth: 1.5,
+                                borderRadius: 4,
+                            },
+                            {
+                                label: 'Average',
+                                data: avgLine,
+                                type: 'line',
+                                borderColor: '#ff2882',
+                                borderWidth: 2,
+                                borderDash: [5, 4],
+                                pointRadius: 0,
+                                fill: false,
+                                tension: 0
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: true, position: 'top', labels: { color: labelColor, font: { size: 11 }, usePointStyle: true, boxWidth: 7 } },
+                            tooltip: {
+                                backgroundColor: isDark ? '#1c1436' : '#37003c',
+                                titleColor: '#00ff87',
+                                bodyColor: '#fff',
+                                borderColor: '#00ff87',
+                                borderWidth: 1
+                            }
+                        },
+                        scales: {
+                            x: { grid: { color: gridColor }, ticks: { color: labelColor, font: { size: 9 }, maxRotation: 45 } },
+                            y: { grid: { color: gridColor }, ticks: { color: labelColor, font: { size: 10 } }, beginAtZero: true }
+                        }
+                    }
+                });
+            }
+
+        } catch (err) {
+            console.error(err);
+            root.innerHTML = `<div class="pp-loading">Failed to load player data.<br><small>${err.message}</small></div>`;
+        }
+    })();
+    </script>
+</body>
+</html>

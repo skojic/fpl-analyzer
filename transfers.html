@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- PWA / Home screen icon -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <meta name="theme-color" content="#37003c">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="FPL Analyzer">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Transfer Suggestions - FPL Analyzer</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="theme.js"></script>
+    <script src="lang.js"></script>
+    <style>
+        .container {
+            max-width: 1000px;
+        }
+        .card {
+            margin: 20px auto;
+            background: rgba(255, 255, 255, 0.98) !important;
+            border: 2px solid rgba(66, 181, 88, 0.3);
+        }
+        [data-theme="dark"] .card {
+            background: var(--bg-surface, #1a1030) !important;
+            border-color: var(--card-border, rgba(255,255,255,0.1));
+        }
+        .card-content {
+            max-height: none;
+        }
+        /* Transfer position group */
+        .tr-group {
+            margin-top: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.88) 0%, rgba(248,250,252,0.88) 100%);
+            border-radius: 16px;
+        }
+        [data-theme="dark"] .tr-group {
+            background: rgba(255,255,255,0.04);
+        }
+        /* Transfer item dark override — fights inline background:white */
+        [data-theme="dark"] .transfer-item {
+            background: rgba(255,255,255,0.06) !important;
+        }
+        /* Reason divider */
+        .transfer-reason {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(0,0,0,0.12);
+        }
+        [data-theme="dark"] .transfer-reason {
+            border-top-color: rgba(255,255,255,0.10);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <button class="back-btn" onclick="window.close()" title="Close" aria-label="Close">←</button>
+            <h1 data-i18n="cardTransfers">Transfer Suggestions</h1>
+            <div class="lang-switcher">
+                <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English">🇬🇧</button>
+                <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski">🇷🇸</button>
+            </div>
+            <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">🌙</button>
+        </header>
+
+        <div class="card">
+            <div class="card-content" id="transfers-content">
+                <div class="loading">Analyzing transfers...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="fpl-api.js"></script>
+    <script src="prediction.js"></script>
+    <script>
+        // Helper function to safely format numbers and avoid NaN
+        function safeNumber(value, decimals = 0, defaultValue = 0) {
+            const num = parseFloat(value);
+            if (isNaN(num) || num === null || num === undefined) {
+                return decimals > 0 ? defaultValue.toFixed(decimals) : defaultValue;
+            }
+            return decimals > 0 ? num.toFixed(decimals) : Math.round(num);
+        }
+
+        async function loadTransfers() {
+            const content = document.getElementById('transfers-content');
+
+            try {
+                const teamData = await FPL_API.getTeamComposition();
+                const allPlayers = await FPL_API.getAllPlayers();
+                const budget = teamData.entryHistory ? teamData.entryHistory.bank / 10 : 0;
+
+                content.innerHTML = `<div class="loading">${t('loadingTransfers')}</div>`;
+
+                const transfers = await Predictor.findBestTransfers(teamData.picks, allPlayers, budget);
+
+                // Group transfers by position
+                const gkpTransfers = transfers.filter(tr => tr.position === 'GKP');
+                const defTransfers = transfers.filter(tr => tr.position === 'DEF');
+                const midTransfers = transfers.filter(tr => tr.position === 'MID');
+                const fwdTransfers = transfers.filter(tr => tr.position === 'FWD');
+
+                let html = `
+                    <h3>${t('transferAnalysis')}</h3>
+
+                    <div class="stats-info" style="margin-bottom:18px; font-size:0.84em; line-height:1.6;">
+                        ${t('howCalcBlock')}
+                    </div>
+
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-card-value">£${safeNumber(budget, 1)}m</div>
+                            <div class="stat-card-label">${t('budgetAvail')}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-card-value">${teamData.entryHistory?.event_transfers || 0}</div>
+                            <div class="stat-card-label">${t('transfersGW')}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-card-value">${gkpTransfers.length}</div>
+                            <div class="stat-card-label">${t('gkpOptions')}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-card-value">${defTransfers.length + midTransfers.length + fwdTransfers.length}</div>
+                            <div class="stat-card-label">${t('outfieldOptions')}</div>
+                        </div>
+                    </div>
+                `;
+
+                if (transfers.length === 0) {
+                    html += `
+                        <div style="text-align: center; padding: 40px; margin-top: 20px; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 12px; border: 2px solid var(--secondary-color);">
+                            <h3 style="color: var(--primary-color); font-size: 1.8em;">${t('perfectTeam')}</h3>
+                            <p style="font-size: 1.1em; margin-top: 10px;">${t('perfectTeamDesc')}</p>
+                        </div>
+                    `;
+                } else {
+                    // Render transfers by position group — GKP first, then outfield
+                    const positionGroups = [
+                        { name: t('gkpFull'), transfers: gkpTransfers, color: '#f59e0b', emoji: '🧤', isGKP: true },
+                        { name: t('defFull'),   transfers: defTransfers, color: '#3b82f6', emoji: '🛡️', isGKP: false },
+                        { name: t('midFull'), transfers: midTransfers, color: '#8b5cf6', emoji: '⚡',  isGKP: false },
+                        { name: t('fwdFull'),    transfers: fwdTransfers, color: '#ef4444', emoji: '⚽',  isGKP: false }
+                    ];
+
+                    for (const group of positionGroups) {
+                        if (group.transfers.length === 0) continue;
+
+                        html += `
+                            <div class="tr-group" style="border-left: 6px solid ${group.color};">
+                                <h3 style="color: ${group.color}; margin-bottom: 20px; font-size: 1.6em; display: flex; align-items: center; gap: 10px;">
+                                    <span style="font-size: 1.4em;">${group.emoji}</span>
+                                    ${group.name}${t('transferSuggSuffix')}
+                                </h3>
+                        `;
+
+                        for (let i = 0; i < group.transfers.length; i++) {
+                            const transfer = group.transfers[i];
+
+                            // Get fixture details for both players
+                            const outFixtures = await FPL_API.getPlayerFixtureDifficulty(transfer.out.id);
+                            const inFixtures = await FPL_API.getPlayerFixtureDifficulty(transfer.in.id);
+
+                            html += `
+                                <div class="transfer-item" style="margin-bottom: 20px; border: 2px solid ${group.color}20; border-radius: 12px;">
+                                    <div class="transfer-header" style="background: linear-gradient(135deg, ${group.color}15 0%, ${group.color}05 100%); border-bottom: 2px solid ${group.color}30;">
+                                        <strong style="color: ${group.color}; font-size: 1.1em;">${t('option')} ${i + 1}</strong>
+                                        <span class="expected-points" style="background: ${group.color}; color: white; padding: 6px 14px; border-radius: 20px; font-weight: bold;">+${safeNumber(transfer.expectedPointsGain, 1)} pts (Next 5 GWs)</span>
+                                    </div>
+
+                                <div class="transfer-players">
+                                    <div class="transfer-out" style="flex: 1;">
+                                        <div><strong style="color: #ff2882;">OUT:</strong> ${transfer.out.name}</div>
+                                        <div style="font-size: 0.9em; color: var(--text-muted, #666); margin-top: 5px;">
+                                            ${transfer.out.team} • ${transfer.out.position} • £${safeNumber(transfer.out.price, 1)}m
+                                        </div>
+                                        <div style="font-size: 0.85em; margin-top: 5px;">
+                                            ${group.isGKP
+                                                ? `CS: ${safeNumber(transfer.out.cleanSheets, 0)} | Saves/G: ${safeNumber(parseFloat(transfer.out.saves || 0) / Math.max(1, parseFloat(transfer.out.starts || 1)), 1)} | Mins: ${safeNumber(transfer.out.minutes, 0)}`
+                                                : `Form: ${safeNumber(transfer.out.form, 1)} | Points: ${safeNumber(transfer.out.points, 0)}`
+                                            }
+                                        </div>
+                                    </div>
+                                    <div class="transfer-arrow" style="font-size: 2em;">→</div>
+                                    <div class="transfer-in" style="flex: 1;">
+                                        <div><strong style="color: #00ff87;">IN:</strong> ${transfer.in.name}</div>
+                                        <div style="font-size: 0.9em; color: var(--text-muted, #666); margin-top: 5px;">
+                                            ${transfer.in.team} • ${transfer.in.position} • £${safeNumber(transfer.in.price, 1)}m
+                                        </div>
+                                        <div style="font-size: 0.85em; margin-top: 5px;">
+                                            ${group.isGKP
+                                                ? `CS: ${safeNumber(transfer.in.cleanSheets, 0)} | Saves/G: ${safeNumber(parseFloat(transfer.in.saves || 0) / Math.max(1, parseFloat(transfer.in.starts || 1)), 1)} | Mins: ${safeNumber(transfer.in.minutes, 0)}`
+                                                : `Form: ${safeNumber(transfer.in.form, 1)} | Points: ${safeNumber(transfer.in.points, 0)}`
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="transfer-reason">
+                                    <strong>${t('transferReason')}:</strong> ${transfer.reason}
+                                </div>
+
+                                <div style="margin-top: 10px; display: flex; justify-content: space-between; font-size: 0.9em;">
+                                    <span><strong>${t('transferCost')}:</strong> ${transfer.cost >= 0 ? '+' : ''}£${safeNumber(transfer.cost, 1)}m</span>
+                                    <span><strong>${t('newBudget')}:</strong> £${safeNumber(budget - transfer.cost, 1)}m</span>
+                                </div>
+
+                                <div style="margin-top: 15px;">
+                                    <h5 style="margin-bottom: 8px;">${t('next3Fixtures')}</h5>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                        <div>
+                                            <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 5px; color: #ff2882;">
+                                                ${transfer.out.name}
+                                            </div>
+                        `;
+
+                        for (let j = 0; j < Math.min(3, outFixtures.length); j++) {
+                            const f = outFixtures[j];
+                            html += `
+                                <div style="font-size: 0.8em; padding: 3px 0;">
+                                    ${f.isHome ? 'vs' : '@'} ${f.opponent}
+                                    <span class="fixture-difficulty difficulty-${f.difficulty}" style="padding: 2px 6px; font-size: 0.9em;">
+                                        ${f.difficulty}
+                                    </span>
+                                </div>
+                            `;
+                        }
+
+                        html += `
+                                        </div>
+                                        <div>
+                                            <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 5px; color: #00ff87;">
+                                                ${transfer.in.name}
+                                            </div>
+                        `;
+
+                        for (let j = 0; j < Math.min(3, inFixtures.length); j++) {
+                            const f = inFixtures[j];
+                            html += `
+                                <div style="font-size: 0.8em; padding: 3px 0;">
+                                    ${f.isHome ? 'vs' : '@'} ${f.opponent}
+                                    <span class="fixture-difficulty difficulty-${f.difficulty}" style="padding: 2px 6px; font-size: 0.9em;">
+                                        ${f.difficulty}
+                                    </span>
+                                </div>
+                            `;
+                        }
+
+                        html += `
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        }
+
+                        html += `</div>`; // Close position group
+                    }
+                }
+
+                // Show players to watch
+                html += `<h3 style="margin-top: 30px; color: var(--primary-color);">${t('playersToWatch')}</h3>`;
+                html += `<p style="margin-bottom: 15px; color: var(--text-muted, #666);">${t('highPerformers')}</p>`;
+
+                // Find top performers by position
+                const positions = ['GKP', 'DEF', 'MID', 'FWD'];
+                const posFullNames = { GKP: t('gkpFull'), DEF: t('defFull'), MID: t('midFull'), FWD: t('fwdFull') };
+                for (const pos of positions) {
+                    const topInPosition = allPlayers
+                        .filter(p => p.position === pos && p.status === 'a' && p.minutes > 100)
+                        .sort((a, b) => b.form - a.form)
+                        .slice(0, 3);
+
+                    html += `<h4 style="margin: 15px 0 10px 0;">${posFullNames[pos]}</h4>`;
+
+                    for (const player of topInPosition) {
+                        const valueScore = Predictor.getValueScore(player);
+                        html += `
+                            <div class="player-row">
+                                <div class="player-info">
+                                    <div class="player-name">${player.name}</div>
+                                    <div class="player-meta">${player.team} • £${safeNumber(player.price, 1)}m • ${safeNumber(player.selectedBy, 1)}% TSB</div>
+                                </div>
+                                <div class="player-stats">
+                                    <div class="stat">
+                                        <div class="stat-value">${safeNumber(player.form, 1)}</div>
+                                        <div class="stat-label">${t('form')}</div>
+                                    </div>
+                                    <div class="stat">
+                                        <div class="stat-value">${safeNumber(player.points, 0)}</div>
+                                        <div class="stat-label">${t('colPoints')}</div>
+                                    </div>
+                                    <div class="stat">
+                                        <div class="stat-value">${safeNumber(valueScore, 1)}</div>
+                                        <div class="stat-label">${t('valueLabel')}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+
+                content.innerHTML = html;
+            } catch (error) {
+                content.innerHTML = `<div class="loading">${t('errorTransfers')}</div>`;
+                console.error(error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadTransfers);
+    </script>
+
+    <footer class="site-footer" data-i18n-html="footerHtml">
+        Made with <span class="heart">&#x2665;</span> for you by <strong>Srdjan Kojic</strong>
+    </footer>
+</body>
+</html>

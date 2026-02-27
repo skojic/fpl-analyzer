@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- PWA / Home screen icon -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <meta name="theme-color" content="#37003c">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="FPL Analyzer">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Player Database - FPL Analyzer</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="theme.js"></script>
+    <script src="lang.js"></script>
+    <style>
+        .container {
+            max-width: 100%;
+            padding: 10px;
+        }
+        .card {
+            margin: 20px auto;
+            background: rgba(255, 255, 255, 0.98) !important;
+            border: 2px solid rgba(66, 181, 88, 0.3);
+        }
+        .card-content {
+            max-height: none;
+            padding: 15px;
+        }
+        table {
+            font-size: 0.85em;
+        }
+        /* Form cell colour coding */
+        td.form-high { background: #dcfce7; }
+        td.form-mid  { background: transparent; }
+        td.form-low  { background: #fee2e2; }
+        [data-theme="dark"] td.form-high { background: rgba(0, 204, 106, 0.22) !important; color: #4ade80; font-weight: 700; }
+        [data-theme="dark"] td.form-low  { background: rgba(239, 68, 68, 0.22) !important; color: #fca5a5; font-weight: 700; }
+        [data-theme="dark"] td.form-mid  { background: transparent !important; }
+        /* Legend pills */
+        .legend-pill { padding: 2px 6px; border-radius: 3px; margin: 0 3px; display: inline-block; }
+        .legend-green  { background: #dcfce7; color: #14532d; }
+        .legend-red    { background: #fee2e2; color: #7f1d1d; }
+        .legend-purple { background: #ddd6fe; color: #3b0764; }
+        .legend-yellow { background: #fef3c7; color: #78350f; }
+        .legend-blue   { background: #e0f2fe; color: #0c4a6e; }
+        [data-theme="dark"] .legend-green  { background: rgba(0,204,106,0.22);  color: #4ade80; }
+        [data-theme="dark"] .legend-red    { background: rgba(239,68,68,0.22);  color: #fca5a5; }
+        [data-theme="dark"] .legend-purple { background: rgba(168,85,247,0.22); color: #d8b4fe; }
+        [data-theme="dark"] .legend-yellow { background: rgba(245,158,11,0.22); color: #fde68a; }
+        [data-theme="dark"] .legend-blue   { background: rgba(59,130,246,0.22); color: #93c5fd; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <button class="back-btn" onclick="window.close()" title="Close" aria-label="Close">←</button>
+            <h1 data-i18n="cardDatabase">Player Database</h1>
+            <div class="lang-switcher">
+                <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English">🇬🇧</button>
+                <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski">🇷🇸</button>
+            </div>
+            <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">🌙</button>
+        </header>
+
+        <!-- Top Performers Section -->
+        <div id="top-performers" style="margin-bottom: 20px;"></div>
+
+        <div class="card">
+            <div class="card-content" id="database-content">
+                <div class="search-container">
+                    <input type="text" id="player-search" data-i18n="searchPlaceholder" data-i18n-attr="placeholder" placeholder="Search players by name, team, or position..." />
+                    <select id="position-filter">
+                        <option value="" data-i18n="allPositions">All Positions</option>
+                        <option value="GKP" data-i18n="goalkeeper">Goalkeeper</option>
+                        <option value="DEF" data-i18n="defender">Defender</option>
+                        <option value="MID" data-i18n="midfielder">Midfielder</option>
+                        <option value="FWD" data-i18n="forward">Forward</option>
+                    </select>
+                    <select id="team-filter">
+                        <option value="" data-i18n="allTeams">All Teams</option>
+                    </select>
+                </div>
+
+                <div class="stats-info" id="db-stats-info"></div>
+
+                <div class="table-container">
+                    <table id="players-table">
+                        <thead>
+                            <tr>
+                                <th onclick="sortTable('name')" title="Player full name">Name ↕</th>
+                                <th onclick="sortTable('team')" title="Current team">Team ↕</th>
+                                <th onclick="sortTable('position')" title="Position: GKP (Goalkeeper), DEF (Defender), MID (Midfielder), FWD (Forward)">Position ↕</th>
+                                <th onclick="sortTable('price')" title="Current selling price in millions - your sell price, not buy price">Price ↕</th>
+                                <th onclick="sortTable('points')" title="Total FPL points accumulated this season">Points ↕</th>
+                                <th onclick="sortTable('form')" title="Form - Average FPL points per game over last 5 matches (key indicator of current performance)">Form ↕</th>
+                                <th onclick="sortTable('pointsPerGame')" title="Points Per Game - Season average FPL points per match (reliability indicator)">Pts/Game ↕</th>
+                                <th onclick="sortTable('selectedBy')" title="Owned By % - Percentage of all FPL managers who own this player (popularity indicator)">Owned By% ↕</th>
+                                <th onclick="sortTable('minutes')" title="Total minutes played this season - Indicates playing time and fitness">Minutes ↕</th>
+                                <th onclick="sortTable('starts')" title="Number of matches started in starting XI - Shows if player is nailed on">Starts ↕</th>
+                                <th onclick="sortTable('goalsScored')" title="Goals Scored - Total goals this season (Opta tracked)">Goals ↕</th>
+                                <th onclick="sortTable('assists')" title="Assists - Total assists provided this season (Opta tracked)">Assists ↕</th>
+                                <th onclick="sortTable('cleanSheets')" title="Clean Sheets - Matches where team conceded 0 goals while player was on pitch (Opta)">Clean Sh ↕</th>
+                                <th onclick="sortTable('goalsConceded')" title="Goals Conceded - Total goals conceded while on pitch (Opta) - Relevant for GKP/DEF">Gls Conc ↕</th>
+                                <th onclick="sortTable('ownGoals')" title="Own Goals - Goals scored against own team (Opta) - Negative FPL points">Own Goals ↕</th>
+                                <th onclick="sortTable('saves')" title="Saves - Total saves made (Opta) - GKP get 1 point per 3 saves">Saves ↕</th>
+                                <th onclick="sortTable('penaltiesSaved')" title="Penalties Saved - Spot kicks saved (Opta) - Worth 5 FPL points each">Pens Saved ↕</th>
+                                <th onclick="sortTable('penaltiesMissed')" title="Penalties Missed - Spot kicks missed or saved (Opta) - Costs -2 FPL points">Pens Missed ↕</th>
+                                <th onclick="sortTable('yellowCards')" title="Yellow Cards - Total bookings (Opta) - Costs -1 FPL point each">Yellows ↕</th>
+                                <th onclick="sortTable('redCards')" title="Red Cards - Total sendings off (Opta) - Costs -3 FPL points each">Reds ↕</th>
+                                <th onclick="sortTable('expectedGoals')" title="Expected Goals (xG) - Quality of shots taken, predicted goals based on shot location, angle, and type (Opta advanced metric)">Exp Goals ↕</th>
+                                <th onclick="sortTable('expectedAssists')" title="Expected Assists (xA) - Quality of chances created for teammates to score (Opta advanced metric)">Exp Assists ↕</th>
+                                <th onclick="sortTable('expectedGoalInvolvements')" title="Expected Goal Involvements (xGI = xG + xA) - Total expected attacking output (Opta composite)">Exp G+A ↕</th>
+                                <th onclick="sortTable('expectedGoalsConceded')" title="Expected Goals Conceded (xGC) - Quality of shots faced, predicted goals to concede (Opta) - For GKP/DEF analysis">Exp Gls Conc ↕</th>
+                                <th onclick="sortTable('expectedGoalsPer90')" title="Expected Goals Per 90 Minutes - xG normalized to full match (Opta rate stat) - Better for comparing players with different minutes">Exp Goals/90 ↕</th>
+                                <th onclick="sortTable('expectedAssistsPer90')" title="Expected Assists Per 90 Minutes - xA normalized to full match (Opta rate stat)">Exp Ast/90 ↕</th>
+                                <th onclick="sortTable('expectedGoalInvolvementsPer90')" title="Expected Goal Involvements Per 90 - xGI normalized to full match (Opta rate stat) - Best attacking metric">Exp G+A/90 ↕</th>
+                                <th onclick="sortTable('expectedGoalsConcededPer90')" title="Expected Goals Conceded Per 90 - xGC normalized to full match (Opta rate stat) - Defensive quality">Exp GC/90 ↕</th>
+                                <th onclick="sortTable('savesPer90')" title="Saves Per 90 Minutes - Save rate normalized (Opta) - GKP performance indicator">Saves/90 ↕</th>
+                                <th onclick="sortTable('influence')" title="Influence - Opta metric evaluating impact on match outcome (goals, assists, winning goals, clearances for DEF)">Influence ↕</th>
+                                <th onclick="sortTable('creativity')" title="Creativity - Opta metric measuring chance creation (key passes, crosses, corners, successful passes in final third)">Creativity ↕</th>
+                                <th onclick="sortTable('threat')" title="Threat - Opta metric measuring goal threat (shots on target, big chances, touches in box, shot accuracy)">Threat ↕</th>
+                                <th onclick="sortTable('ictIndex')" title="ICT Index - Combined Influence, Creativity, Threat metric (Opta composite score) - Overall player quality indicator">ICT Index ↕</th>
+                                <th onclick="sortTable('bonus')" title="Total Bonus Points - Actual bonus points earned this season (top 3 BPS in each match get 3/2/1 bonus)">Bonus Pts ↕</th>
+                                <th onclick="sortTable('bps')" title="Bonus Points System - Opta scoring (passes, tackles, saves, shots, dribbles, clearances) - Determines bonus point winners">Bonus Sys ↕</th>
+                                <th onclick="sortTable('penaltiesOrder')" title="Penalties Order - Penalty taker priority (1 = first choice, 99 = not taker) - Key for goal potential">Pen Taker ↕</th>
+                                <th onclick="sortTable('directFreekicksOrder')" title="Direct Free Kicks Order - Free kick taker priority (1 = first choice) - Extra goal opportunity">Free Kick ↕</th>
+                                <th onclick="sortTable('cornersAndIndirectFreekicksOrder')" title="Corners & Indirect Free Kicks Order - Set piece taker priority (1 = first choice) - Assist potential">Corner Kick ↕</th>
+                                <th onclick="sortTable('transfersInEvent')" title="Transfers In This Gameweek - Number of managers who bought this player this GW (momentum indicator)">Bought GW ↕</th>
+                                <th onclick="sortTable('transfersOutEvent')" title="Transfers Out This Gameweek - Number of managers who sold this player this GW (concern indicator)">Sold GW ↕</th>
+                                <th onclick="sortTable('transfersIn')" title="Total Transfers In - Cumulative purchases this season (popularity trend)">Bought Total ↕</th>
+                                <th onclick="sortTable('transfersOut')" title="Total Transfers Out - Cumulative sales this season (departure trend)">Sold Total ↕</th>
+                                <th onclick="sortTable('valueForm')" title="Value Form - Points per million in current form (value for money in recent games)">Value (Form) ↕</th>
+                                <th onclick="sortTable('valueSeason')" title="Value Season - Points per million for entire season (value for money overall)">Value (Season) ↕</th>
+                                <th onclick="sortTable('costChangeEvent')" title="Price Change This Gameweek - £m change in player price this GW (0.1m increments)">Price Chg GW ↕</th>
+                                <th onclick="sortTable('costChangeStart')" title="Price Change Since Season Start - Total £m change in price since GW1 (capital gains/losses)">Price Chg Total ↕</th>
+                                <th onclick="sortTable('chanceOfPlayingNextRound')" title="Chance of Playing Next Round - Injury/availability % for upcoming match (100 = fully fit, 75 = doubt, 50 = major doubt, 0 = ruled out)">Fitness % ↕</th>
+                            </tr>
+                        </thead>
+                        <tbody id="players-tbody">
+                            <tr><td colspan="48" class="loading">Loading players...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div style="margin-top: 15px; text-align: center; color: #666;">
+                    <span data-i18n="showingPlayers">Showing</span> <span id="player-count">0</span> <span data-i18n="players">players</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="fpl-api.js"></script>
+    <script>
+        let allPlayers = [];
+        let filteredPlayers = [];
+        let sortColumn = 'points';
+        let sortDirection = 'desc';
+
+        // Helper function to safely format numbers
+        function safeNumber(value, decimals = 0, defaultValue = 0) {
+            const num = parseFloat(value);
+            if (isNaN(num) || num === null || num === undefined) {
+                return decimals > 0 ? defaultValue.toFixed(decimals) : defaultValue;
+            }
+            return decimals > 0 ? num.toFixed(decimals) : Math.round(num);
+        }
+
+        // Display top performers in headline
+        function displayTopPerformers(players) {
+            const topPerformersDiv = document.getElementById('top-performers');
+
+            // Filter out players with insufficient minutes
+            const activePlayers = players.filter(p => (p.minutes || 0) > 200);
+
+            // 1. Top scorer (Total Points)
+            const topScorer = [...activePlayers].sort((a, b) => (b.points || 0) - (a.points || 0))[0];
+
+            // 2. Best form (last 5 games)
+            const bestForm = [...activePlayers].sort((a, b) => (b.form || 0) - (a.form || 0))[0];
+
+            // 3. Most minutes played
+            const mostMinutes = [...activePlayers].sort((a, b) => (b.minutes || 0) - (a.minutes || 0))[0];
+
+            // 4. Most goals scored
+            const mostGoals = [...activePlayers].sort((a, b) => (b.goalsScored || 0) - (a.goalsScored || 0))[0];
+
+            // 5. Most assists
+            const mostAssists = [...activePlayers].sort((a, b) => (b.assists || 0) - (a.assists || 0))[0];
+
+            // 6. Most key passes
+            const mostPasses = [...activePlayers].sort((a, b) => (b.keyPasses || 0) - (a.keyPasses || 0))[0];
+
+            // 7. Most tackles
+            const mostTackles = [...activePlayers].sort((a, b) => (b.tackles || 0) - (a.tackles || 0))[0];
+
+            // 8. Best xGI (Expected Goal Involvements)
+            const bestXGI = [...activePlayers].sort((a, b) => (b.expectedGoalInvolvements || 0) - (a.expectedGoalInvolvements || 0))[0];
+
+            topPerformersDiv.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                    <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); padding: 15px; border-radius: 12px; border-left: 4px solid #f59e0b; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                        <div style="font-size: 0.85em; color: #92400e; font-weight: 600; margin-bottom: 5px;">${t('topScorerLabel')}</div>
+                        <div style="font-size: 1.3em; font-weight: 700; color: #78350f;">${topScorer.name}</div>
+                        <div style="font-size: 0.9em; color: #92400e; margin-top: 5px;">${topScorer.team} • ${safeNumber(topScorer.points, 0)} ${t('pts')}</div>
+                    </div>
+
+                    <div style="background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); padding: 15px; border-radius: 12px; border-left: 4px solid #22c55e; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                        <div style="font-size: 0.85em; color: #14532d; font-weight: 600; margin-bottom: 5px;">${t('bestFormLabel')}</div>
+                        <div style="font-size: 1.3em; font-weight: 700; color: #15803d;">${bestForm.name}</div>
+                        <div style="font-size: 0.9em; color: #14532d; margin-top: 5px;">${bestForm.team} • ${t('form')}: ${safeNumber(bestForm.form, 1)}</div>
+                    </div>
+
+                    <div style="background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%); padding: 15px; border-radius: 12px; border-left: 4px solid #6366f1; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                        <div style="font-size: 0.85em; color: #312e81; font-weight: 600; margin-bottom: 5px;">${t('mostMinsLabel')}</div>
+                        <div style="font-size: 1.3em; font-weight: 700; color: #4338ca;">${mostMinutes.name}</div>
+                        <div style="font-size: 0.9em; color: #312e81; margin-top: 5px;">${mostMinutes.team} • ${safeNumber(mostMinutes.minutes, 0)} ${t('mins')}</div>
+                    </div>
+
+                    <div style="background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%); padding: 15px; border-radius: 12px; border-left: 4px solid #ec4899; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                        <div style="font-size: 0.85em; color: #831843; font-weight: 600; margin-bottom: 5px;">${t('mostGoalsLabel')}</div>
+                        <div style="font-size: 1.3em; font-weight: 700; color: #9f1239;">${mostGoals.name}</div>
+                        <div style="font-size: 0.9em; color: #831843; margin-top: 5px;">${mostGoals.team} • ${safeNumber(mostGoals.goalsScored, 0)} ${t('goalsLabel')}</div>
+                    </div>
+
+                    <div style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); padding: 15px; border-radius: 12px; border-left: 4px solid #3b82f6; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                        <div style="font-size: 0.85em; color: #1e3a8a; font-weight: 600; margin-bottom: 5px;">${t('mostAssistsLabel')}</div>
+                        <div style="font-size: 1.3em; font-weight: 700; color: #1e40af;">${mostAssists.name}</div>
+                        <div style="font-size: 0.9em; color: #1e3a8a; margin-top: 5px;">${mostAssists.team} • ${safeNumber(mostAssists.assists, 0)} ${t('assistsLabel')}</div>
+                    </div>
+
+                    <div style="background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%); padding: 15px; border-radius: 12px; border-left: 4px solid #a855f7; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                        <div style="font-size: 0.85em; color: #581c87; font-weight: 600; margin-bottom: 5px;">${t('mostKeyPassLabel')}</div>
+                        <div style="font-size: 1.3em; font-weight: 700; color: #6b21a8;">${mostPasses.name}</div>
+                        <div style="font-size: 0.9em; color: #581c87; margin-top: 5px;">${mostPasses.team} • ${safeNumber(mostPasses.keyPasses, 0)} ${t('passesLabel')}</div>
+                    </div>
+
+                    <div style="background: linear-gradient(135deg, #fed7aa 0%, #fdba74 100%); padding: 15px; border-radius: 12px; border-left: 4px solid #f97316; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                        <div style="font-size: 0.85em; color: #7c2d12; font-weight: 600; margin-bottom: 5px;">${t('mostTacklesLabel')}</div>
+                        <div style="font-size: 1.3em; font-weight: 700; color: #9a3412;">${mostTackles.name}</div>
+                        <div style="font-size: 0.9em; color: #7c2d12; margin-top: 5px;">${mostTackles.team} • ${safeNumber(mostTackles.tackles, 0)} ${t('tacklesLabel')}</div>
+                    </div>
+
+                    <div style="background: linear-gradient(135deg, #ccfbf1 0%, #99f6e4 100%); padding: 15px; border-radius: 12px; border-left: 4px solid #14b8a6; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                        <div style="font-size: 0.85em; color: #134e4a; font-weight: 600; margin-bottom: 5px;">${t('bestXGILabel')}</div>
+                        <div style="font-size: 1.3em; font-weight: 700; color: #115e59;">${bestXGI.name}</div>
+                        <div style="font-size: 0.9em; color: #134e4a; margin-top: 5px;">${bestXGI.team} • xGI: ${safeNumber(bestXGI.expectedGoalInvolvements, 1)}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderDbStats() {
+            document.getElementById('db-stats-info').innerHTML = t('dbStatsBlock');
+        }
+
+        async function loadDatabase() {
+            try {
+                renderDbStats();
+                const players = await FPL_API.getAllPlayers();
+                allPlayers = players;
+                filteredPlayers = players;
+
+                // Display top performers
+                displayTopPerformers(players);
+
+                // Populate team filter
+                const teams = [...new Set(players.map(p => p.team))].sort();
+                const teamFilter = document.getElementById('team-filter');
+                teams.forEach(team => {
+                    const option = document.createElement('option');
+                    option.value = team;
+                    option.textContent = team;
+                    teamFilter.appendChild(option);
+                });
+
+                // Render table
+                renderPlayersTable();
+
+                // Add event listeners
+                document.getElementById('player-search').addEventListener('input', filterPlayers);
+                document.getElementById('position-filter').addEventListener('change', filterPlayers);
+                document.getElementById('team-filter').addEventListener('change', filterPlayers);
+
+            } catch (error) {
+                document.getElementById('database-content').innerHTML =
+                    '<div class="loading">Error loading player database</div>';
+                console.error(error);
+            }
+        }
+
+        function filterPlayers() {
+            const searchTerm = document.getElementById('player-search').value.toLowerCase();
+            const positionFilter = document.getElementById('position-filter').value;
+            const teamFilter = document.getElementById('team-filter').value;
+
+            filteredPlayers = allPlayers.filter(player => {
+                const matchesSearch = player.name.toLowerCase().includes(searchTerm) ||
+                                    player.fullName.toLowerCase().includes(searchTerm) ||
+                                    player.team.toLowerCase().includes(searchTerm);
+                const matchesPosition = !positionFilter || player.position === positionFilter;
+                const matchesTeam = !teamFilter || player.team === teamFilter;
+
+                return matchesSearch && matchesPosition && matchesTeam;
+            });
+
+            renderPlayersTable();
+        }
+
+        function sortTable(column) {
+            if (sortColumn === column) {
+                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortColumn = column;
+                sortDirection = 'desc';
+            }
+
+            filteredPlayers.sort((a, b) => {
+                let aVal = a[column];
+                let bVal = b[column];
+
+                if (typeof aVal === 'string') {
+                    aVal = aVal.toLowerCase();
+                    bVal = bVal.toLowerCase();
+                }
+
+                if (sortDirection === 'asc') {
+                    return aVal > bVal ? 1 : -1;
+                } else {
+                    return aVal < bVal ? 1 : -1;
+                }
+            });
+
+            renderPlayersTable();
+        }
+
+        function renderPlayersTable() {
+            const tbody = document.getElementById('players-tbody');
+            const countSpan = document.getElementById('player-count');
+
+            countSpan.textContent = filteredPlayers.length;
+
+            if (filteredPlayers.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="48" style="text-align: center; padding: 20px;">${t('noPlayersFound')}</td></tr>`;
+                return;
+            }
+
+            // Display all filtered players
+            const displayPlayers = filteredPlayers.slice(0, 200);
+
+            let html = '';
+            for (const player of displayPlayers) {
+                const availability = player.chanceOfPlayingNextRound !== null && player.chanceOfPlayingNextRound !== undefined
+                    ? player.chanceOfPlayingNextRound
+                    : 100;
+                const availStyle = availability < 75 ? 'color: #ff2882; font-weight: bold;' : '';
+
+                html += `
+                    <tr title="${player.fullName || player.name} - ${player.news || 'No injury news'}">
+                        <td><strong>${player.name}</strong></td>
+                        <td>${player.team}</td>
+                        <td><strong>${player.position}</strong></td>
+                        <td>£${safeNumber(player.price, 1)}</td>
+                        <td><strong>${safeNumber(player.points, 0)}</strong></td>
+                        <td class="${player.form > 6 ? 'form-high' : player.form < 3 ? 'form-low' : 'form-mid'}"><strong>${safeNumber(player.form, 1)}</strong></td>
+                        <td>${safeNumber(player.pointsPerGame, 1)}</td>
+                        <td>${safeNumber(player.selectedBy, 1)}%</td>
+                        <td>${safeNumber(player.minutes, 0)}</td>
+                        <td>${safeNumber(player.starts, 0)}</td>
+                        <td>${safeNumber(player.goalsScored, 0)}</td>
+                        <td>${safeNumber(player.assists, 0)}</td>
+                        <td>${safeNumber(player.cleanSheets, 0)}</td>
+                        <td>${safeNumber(player.goalsConceded, 0)}</td>
+                        <td>${safeNumber(player.ownGoals, 0)}</td>
+                        <td>${safeNumber(player.saves, 0)}</td>
+                        <td>${safeNumber(player.penaltiesSaved, 0)}</td>
+                        <td>${safeNumber(player.penaltiesMissed, 0)}</td>
+                        <td>${safeNumber(player.yellowCards, 0)}</td>
+                        <td>${safeNumber(player.redCards, 0)}</td>
+                        <td><strong>${safeNumber(player.expectedGoals, 1)}</strong></td>
+                        <td><strong>${safeNumber(player.expectedAssists, 1)}</strong></td>
+                        <td style="background: ${player.expectedGoalInvolvements > 5 ? '#ddd6fe' : ''}"><strong>${safeNumber(player.expectedGoalInvolvements, 1)}</strong></td>
+                        <td>${safeNumber(player.expectedGoalsConceded, 1)}</td>
+                        <td>${safeNumber(player.expectedGoalsPer90, 2)}</td>
+                        <td>${safeNumber(player.expectedAssistsPer90, 2)}</td>
+                        <td style="background: ${player.expectedGoalInvolvementsPer90 > 0.5 ? '#fef3c7' : ''}"><strong>${safeNumber(player.expectedGoalInvolvementsPer90, 2)}</strong></td>
+                        <td>${safeNumber(player.expectedGoalsConcededPer90, 2)}</td>
+                        <td>${safeNumber(player.savesPer90, 1)}</td>
+                        <td>${safeNumber(player.influence, 1)}</td>
+                        <td>${safeNumber(player.creativity, 1)}</td>
+                        <td>${safeNumber(player.threat, 1)}</td>
+                        <td style="background: ${player.ictIndex > 100 ? '#e0f2fe' : ''}"><strong>${safeNumber(player.ictIndex, 1)}</strong></td>
+                        <td>${safeNumber(player.bonus, 0)}</td>
+                        <td>${safeNumber(player.bps, 0)}</td>
+                        <td style="${player.penaltiesOrder === 1 ? 'background: #dcfce7; font-weight: bold;' : ''}">${player.penaltiesOrder || '-'}</td>
+                        <td>${player.directFreekicksOrder || '-'}</td>
+                        <td>${player.cornersAndIndirectFreekicksOrder || '-'}</td>
+                        <td style="color: #00ff87;">${safeNumber(player.transfersInEvent, 0)}</td>
+                        <td style="color: #ff2882;">${safeNumber(player.transfersOutEvent, 0)}</td>
+                        <td style="font-size: 0.85em;">${safeNumber(player.transfersIn, 0)}</td>
+                        <td style="font-size: 0.85em;">${safeNumber(player.transfersOut, 0)}</td>
+                        <td>${safeNumber(player.valueForm, 1)}</td>
+                        <td>${safeNumber(player.valueSeason, 1)}</td>
+                        <td style="color: ${player.costChangeEvent > 0 ? '#00ff87' : player.costChangeEvent < 0 ? '#ff2882' : ''}">${player.costChangeEvent > 0 ? '+' : ''}${safeNumber(player.costChangeEvent / 10, 1)}</td>
+                        <td style="color: ${player.costChangeStart > 0 ? '#00ff87' : player.costChangeStart < 0 ? '#ff2882' : ''}">${player.costChangeStart > 0 ? '+' : ''}${safeNumber(player.costChangeStart / 10, 1)}</td>
+                        <td style="${availStyle}">${availability}%</td>
+                    </tr>
+                `;
+            }
+
+            tbody.innerHTML = html;
+        }
+
+        document.addEventListener('DOMContentLoaded', loadDatabase);
+    </script>
+
+    <footer class="site-footer" data-i18n-html="footerHtml">
+        Made with <span class="heart">&#x2665;</span> for you by <strong>Srdjan Kojic</strong>
+    </footer>
+</body>
+</html>
