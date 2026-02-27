@@ -11,11 +11,13 @@ A comprehensive web application for analyzing and optimizing your Fantasy Premie
 - Captain (C) and vice-captain (VC) badges on player shirts
 - Bench/substitutes section with all 4 substitute players
 - Team value, bank balance, and current gameweek performance
-- Dynamic team name from FPL API
+- Dynamic team name fetched live from the FPL API
+- **Upcoming fixture badge** per player showing next opponent and difficulty
+- **Kit colour picker** — choose from 9 kit colour schemes (Red, Blue, Black, Yellow, and two-tone combos); preference saved in browser
 
 ### 📊 Performance Analytics
 - Overall points and rank tracking
-- Gameweek-by-gameweek performance history
+- Gameweek-by-gameweek performance history visualised with **Chart.js**
 - Season statistics (average points, best/worst gameweeks)
 - Transfer history and trends
 
@@ -24,12 +26,11 @@ A comprehensive web application for analyzing and optimizing your Fantasy Premie
 - Filter by position, team, or name
 - Sortable columns (name, team, price, points, form, etc.)
 - **Interactive tooltips** on column headers explaining each statistic
-- **Extended statistics** (16 columns) including:
+- **Extended statistics** columns including:
   - Basic: Name, Team, Position, Price
-  - Performance: Total Points, Form (last 5 games), Minutes, Points Per Game
-  - **Expected stats**: xG (Expected Goals), xA (Expected Assists), xGI (Expected Goal Involvements)
-  - **Advanced metrics**: Starts, Bonus Points, BPS (Bonus Points System), ICT Index (Influence/Creativity/Threat)
-  - Ownership: TSB% (Team Selection By percentage)
+  - Performance: Total Points, Form (last 5 games), Goals, Assists
+  - **Expected stats**: xGI (Expected Goal Involvements)
+  - **Advanced metrics**: Tackles, Ownership %
 
 ### 🎯 Points Prediction
 - AI-powered predictions for next gameweek
@@ -57,52 +58,103 @@ A comprehensive web application for analyzing and optimizing your Fantasy Premie
 - "Players to Watch" section by position
 - Value score calculations (points per million)
 
+### ⚖️ Player Comparison
+- Compare **up to 3 players** side-by-side in a dedicated full-page view
+- Inline search with live autocomplete for fast player lookup
+- Visual stat bars across all key FPL metrics (points, form, price, xGI, ICT, BPS, ownership, etc.)
+- Highlighted "winner" column for each metric at a glance
+
 ## Technology Stack
 
 - **HTML5**: Semantic markup and structure
 - **CSS3**: Custom responsive design (no frameworks)
 - **Vanilla JavaScript**: No heavy dependencies
+- **Chart.js 4.4**: Gameweek performance charts
 - **FPL API**: Official Fantasy Premier League API
+- **PWA**: Progressive Web App — installable on iOS, Android, and desktop (manifest + service-worker ready)
+
+## UI / UX Features
+
+### 🌙 Dark / Light Theme
+- Toggle between dark and light mode with the moon/sun button in the header
+- Preference is saved in the browser and applied instantly on next visit with no flash
+
+### 🌐 Bilingual Support (English / Serbian)
+- Full translation of the entire UI via `lang.js`
+- Switch languages with the 🇬🇧 / 🇷🇸 flag buttons — available both on the onboarding screen and in the main header
+
+### 🛡️ FPL Guardian Onboarding
+- First-visit animated splash screen with a stadium background and moving light beams
+- Prompts the user to enter their FPL Team ID (stored in `localStorage`)
+- Built-in "How to find your Team ID" guide
+- On subsequent visits the splash is skipped automatically
+
+### 🔄 Runtime Team ID Switching
+- **Change ID** button in the header opens a modal without requiring a page reload
+- Clears the API cache and re-fetches all data for the new team
+
+### 🎨 Kit Colour Picker
+- 9 kit colour themes for the pitch view: Red, Blue, Black, Yellow, Red & White, Black & White, Blue & White, Red & Black, and Purple & White (default)
+- Selection persists across sessions via `localStorage`
 
 ## How to Use
 
 1. **Open the Application**
-   - Simply open `index.html` in any modern web browser
+   - Open `index.html` in any modern web browser (or deploy — see below)
    - No server setup or installation required
 
-2. **Navigate the Dashboard**
-   - The main page displays all cards in a responsive grid
-   - Each card shows a summary of that section
+2. **Enter Your FPL Team ID**
+   - The Guardian splash screen will ask for your Team ID on first visit
+   - Find it at `fantasy.premierleague.com` → Points → the number in your URL
+   - Your ID is saved in the browser; subsequent visits go straight to the dashboard
 
-3. **Expand Cards**
+3. **Navigate the Dashboard**
+   - The main page displays 6 cards in a responsive grid
+   - Each card shows a live summary of that section
+
+4. **Expand Cards**
    - Click the expand button (⤢) in the top-right of any card
-   - Opens that section in a new tab with full details
+   - Opens that section in a full-page view with complete details
 
-4. **Search Players**
+5. **Search Players**
    - Use the Player Database card to search and filter
    - Click column headers to sort
    - Use filters for position and team
 
-5. **Get Transfer Suggestions**
+6. **Compare Players**
+   - Use the Player Comparison card to search and select up to 3 players
+   - Stat bars highlight the leader in each category
+
+7. **Get Transfer Suggestions**
    - View AI-generated transfer recommendations
    - See expected points gain for next 5 gameweeks
    - Compare fixtures between incoming and outgoing players
 
+8. **Switch Team / Language / Theme**
+   - Use **Change ID** in the header to analyse a different team
+   - Use 🇬🇧 / 🇷🇸 to toggle language
+   - Use 🌙 / ☀️ to toggle dark/light mode
+
 ## File Structure
 
 ```
-fpl/
-├── index.html              # Main dashboard page
-├── styles.css              # All CSS styling
+fpl-analyzer/
+├── index.html              # Main dashboard — 6-card grid + Guardian onboarding
+├── styles.css              # All CSS styling (dark/light themes, responsive)
 ├── app.js                  # Main application logic
-├── fpl-api.js             # FPL API integration
-├── prediction.js          # Points prediction algorithm
-├── team.html              # Expanded team view
-├── performance.html       # Expanded performance view
-├── database.html          # Expanded player database
-├── prediction.html        # Expanded predictions view
-├── transfers.html         # Expanded transfers view
-└── README.md              # This file
+├── fpl-api.js              # FPL API integration & caching
+├── prediction.js           # Points prediction algorithm
+├── lang.js                 # Bilingual translations (English / Serbian)
+├── theme.js                # Dark/light theme manager (runs before render)
+├── kits.js                 # Kit colour picker (9 themes, persisted)
+├── team.html               # Expanded team / pitch view
+├── performance.html        # Expanded performance & charts view
+├── database.html           # Expanded player database view
+├── prediction.html         # Expanded predictions view
+├── transfers.html          # Expanded transfers view
+├── comparison.html         # Full-page player comparison view
+├── manifest.json           # PWA manifest (installable app)
+└── README.md               # This file
 ```
 
 ## FPL Scoring Rules (Used in Predictions)
@@ -190,18 +242,22 @@ The enhanced points prediction system uses:
 
 - All data is fetched directly from the official FPL API
 - No user data is stored or transmitted to third parties
-- Team ID (1146081) is hardcoded but can be changed in `fpl-api.js`
+- Your FPL Team ID is saved only in your own browser (`localStorage`) and never sent anywhere
+- Theme, language, and kit preferences are also stored locally in your browser
 
 ## Customization
 
-To use with a different FPL team:
+### Switching Teams
+Use the **Change ID** button in the app header — no code changes needed.
 
+### Default Team ID (optional, for self-hosted deployments)
+If you want to pre-fill a Team ID for a specific deployment:
 1. Open `fpl-api.js`
-2. Change the `TEAM_ID` value on line 3:
+2. Set the `TEAM_ID` default value:
    ```javascript
    TEAM_ID: YOUR_TEAM_ID_HERE,
    ```
-3. Update the team ID in HTML files (search for "1146081")
+3. The Guardian onboarding will still let users override this with their own ID.
 
 ## Known Limitations
 
@@ -212,16 +268,17 @@ To use with a different FPL team:
   - Player transfers between clubs
 - API rate limits may apply during heavy usage
 - Some features require active gameweeks
+- The FPL API does not expose granular defensive stats (tackles, interceptions) — the BPS metric is used as a composite proxy
 
 ## Future Enhancements
 
 Potential features for future versions:
-- Multiple team comparison
 - League standings integration
 - Price change predictions
-- Chip strategy recommendations
+- Chip strategy recommendations (Wildcard, Free Hit, Bench Boost, Triple Captain)
 - Historical season data analysis
-- Export functionality for reports
+- Export / share functionality for reports
+- Service worker for full offline support
 
 ## API Credits
 
