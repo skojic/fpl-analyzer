@@ -2,6 +2,8 @@
 
 A comprehensive web application for analyzing and optimizing your Fantasy Premier League team using real-time data from the official FPL API.
 
+Link to the APP: https://skojic.github.io/fpl-analyzer/
+
 ## Features
 
 ### 🏆 My Team
