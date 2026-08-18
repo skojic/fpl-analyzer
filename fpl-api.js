@@ -3,12 +3,6 @@ const FPL_API = {
     BASE_URL: 'https://fantasy.premierleague.com/api',
     // Vercel serverless proxy for browser CORS support
     VERCEL_PROXY: 'https://fpl-analyzer-82wvbp663-fpl-analyzer1.vercel.app/api/proxy?url=',
-    // Fallback CORS proxies
-    CORS_PROXIES: [
-        'https://api.allorigins.win/raw?url=',
-        'https://corsproxy.io/?',
-        'https://cors-anywhere.herokuapp.com/'
-    ],
     TEAM_ID: parseInt(localStorage.getItem('fpl_team_id'), 10) || 1146081,
     MAX_RETRIES: 2,
     RETRY_DELAY: 1000, // ms
@@ -22,67 +16,53 @@ const FPL_API = {
         managerHistory: null
     },
 
-    // Helper to build URL - tries Vercel proxy first (for browsers), then direct, then fallback proxies
-    buildUrl(endpoint, proxyIndex = 0) {
-        // For browser environments, try Vercel proxy first
-        if (this.IS_BROWSER && proxyIndex === -2) {
+    // Helper to build URL - uses Vercel proxy in browser, direct in Node.js
+    buildUrl(endpoint, useProxy = false) {
+        // In browser, always use Vercel proxy
+        if (this.IS_BROWSER) {
             return this.VERCEL_PROXY + encodeURIComponent(endpoint);
         }
-        // Try direct access
-        if (proxyIndex === -1) {
-            return endpoint;
-        }
-        // If direct fails, use CORS proxy
-        if (proxyIndex >= this.CORS_PROXIES.length) {
-            return endpoint; // fallback to direct
-        }
-        const proxy = this.CORS_PROXIES[proxyIndex];
-        return proxy + encodeURIComponent(endpoint);
+        // In Node.js, use direct API access
+        return endpoint;
     },
 
-    // Enhanced fetch with retry logic and proxy fallback
+    // Enhanced fetch with retry logic
     async fetchWithRetry(endpoint, options = {}) {
         let lastError;
-        // For browsers: try Vercel proxy first, then direct, then fallback proxies
-        // For Node.js: try direct first, then fallback proxies
-        const proxiesToTry = this.IS_BROWSER
-            ? [-2, -1, 0, 1, 2]  // -2 = Vercel proxy, -1 = direct, then others
-            : [-1, 0, 1, 2];      // direct first for Node.js
 
-        for (let proxyIdx = 0; proxyIdx < proxiesToTry.length; proxyIdx++) {
-            const proxyIndex = proxiesToTry[proxyIdx];
+        for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
+            try {
+                const url = this.buildUrl(endpoint);
+                console.log(`Attempt ${attempt + 1}: Fetching ${this.IS_BROWSER ? 'via Vercel proxy' : 'direct API'}`);
 
-            for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
-                try {
-                    const url = this.buildUrl(endpoint, proxyIndex);
-                    const response = await fetch(url, {
-                        ...options,
-                        headers: {
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                            ...options.headers
-                        }
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                const response = await fetch(url, {
+                    ...options,
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                        ...options.headers
                     }
+                });
 
-                    return await response.json();
-                } catch (error) {
-                    lastError = error;
-                    const proxyName = proxyIndex === -2 ? 'Vercel proxy' : proxyIndex === -1 ? 'direct' : `proxy ${proxyIndex}`;
-                    console.warn(`[${proxyName}] Attempt ${attempt + 1} failed:`, error.message);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
 
-                    // If this is not the last attempt for this proxy, retry with delay
-                    if (attempt < this.MAX_RETRIES) {
-                        await new Promise(resolve => setTimeout(resolve, this.RETRY_DELAY));
-                    }
-                    // Otherwise, continue to next proxy
+                const data = await response.json();
+                console.log(`✅ Success! Data received`);
+                return data;
+            } catch (error) {
+                lastError = error;
+                console.error(`❌ Attempt ${attempt + 1} failed:`, error.message);
+
+                // If this is not the last attempt, retry with delay
+                if (attempt < this.MAX_RETRIES) {
+                    console.log(`⏳ Retrying in ${this.RETRY_DELAY}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, this.RETRY_DELAY));
                 }
             }
         }
 
-        throw new Error(`Failed to fetch ${endpoint} after trying all proxies: ${lastError.message}`);
+        throw new Error(`Failed to fetch ${endpoint} after ${this.MAX_RETRIES + 1} attempts: ${lastError.message}`);
     },
 
     // Fetch bootstrap-static data (all players, teams, gameweeks)

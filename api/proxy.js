@@ -5,16 +5,19 @@
  * Usage: /api/proxy?url=https://fantasy.premierleague.com/api/...
  */
 
-export default async function handler(req, res) {
-    // Only allow GET and OPTIONS requests
+module.exports = async (req, res) => {
+    // Set CORS headers for all responses
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS, POST');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    // Handle OPTIONS requests
     if (req.method === 'OPTIONS') {
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
         res.status(200).end();
         return;
     }
 
+    // Only allow GET requests
     if (req.method !== 'GET') {
         res.status(405).json({ error: 'Method not allowed' });
         return;
@@ -28,21 +31,24 @@ export default async function handler(req, res) {
         return;
     }
 
-    // Only allow FPL API requests
-    if (!url.includes('fantasy.premierleague.com')) {
-        res.status(400).json({ error: 'Only FPL API requests allowed' });
-        return;
-    }
-
     try {
+        // Decode the URL
+        const decodedUrl = decodeURIComponent(url);
+        console.log('Proxying request to:', decodedUrl);
+
+        // Only allow FPL API requests
+        if (!decodedUrl.includes('fantasy.premierleague.com')) {
+            res.status(400).json({ error: 'Only FPL API requests allowed' });
+            return;
+        }
+
         // Fetch from FPL API with proper headers
-        const response = await fetch(decodeURIComponent(url), {
+        const response = await fetch(decodedUrl, {
             method: 'GET',
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                 'Accept': 'application/json'
-            },
-            timeout: 10000
+            }
         });
 
         if (!response.ok) {
@@ -51,20 +57,16 @@ export default async function handler(req, res) {
 
         const data = await response.json();
 
-        // Set CORS headers to allow requests from anywhere
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        // Set response headers
         res.setHeader('Content-Type', 'application/json');
         res.setHeader('Cache-Control', 'public, max-age=300'); // 5 min cache
 
         res.status(200).json(data);
     } catch (error) {
         console.error('Proxy error:', error);
-        res.setHeader('Access-Control-Allow-Origin', '*');
         res.status(502).json({
             error: 'Failed to fetch from FPL API',
             message: error.message
         });
     }
-}
+};
