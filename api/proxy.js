@@ -6,43 +6,47 @@
  */
 
 module.exports = async (req, res) => {
-    // Set CORS headers for all responses
+    // CRITICAL: Set CORS headers IMMEDIATELY for ALL responses
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS, POST');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Content-Type', 'application/json');
 
-    // Handle OPTIONS requests
+    // Handle preflight OPTIONS requests
     if (req.method === 'OPTIONS') {
-        res.status(200).end();
-        return;
+        return res.status(200).end();
     }
 
     // Only allow GET requests
     if (req.method !== 'GET') {
-        res.status(405).json({ error: 'Method not allowed' });
-        return;
-    }
-
-    const { url } = req.query;
-
-    // Validate URL parameter
-    if (!url) {
-        res.status(400).json({ error: 'Missing url parameter' });
-        return;
+        return res.status(405).json({ 
+            error: 'Method not allowed',
+            method: req.method
+        });
     }
 
     try {
-        // Decode the URL
-        const decodedUrl = decodeURIComponent(url);
-        console.log('Proxying request to:', decodedUrl);
+        const { url } = req.query;
 
-        // Only allow FPL API requests
-        if (!decodedUrl.includes('fantasy.premierleague.com')) {
-            res.status(400).json({ error: 'Only FPL API requests allowed' });
-            return;
+        // Validate URL parameter exists
+        if (!url) {
+            return res.status(400).json({ error: 'Missing url parameter' });
         }
 
-        // Fetch from FPL API with proper headers
+        // Decode the URL
+        const decodedUrl = decodeURIComponent(url);
+        
+        // Only allow FPL API requests
+        if (!decodedUrl.includes('fantasy.premierleague.com')) {
+            return res.status(400).json({ 
+                error: 'Only FPL API requests allowed',
+                url: decodedUrl
+            });
+        }
+
+        console.log(`[Proxy] Fetching: ${decodedUrl}`);
+
+        // Fetch from FPL API
         const response = await fetch(decodedUrl, {
             method: 'GET',
             headers: {
@@ -51,22 +55,44 @@ module.exports = async (req, res) => {
             }
         });
 
+        // Read response body
+        const responseText = await response.text();
+
+        // Log response status
+        console.log(`[Proxy] Response status: ${response.status}`);
+
         if (!response.ok) {
-            throw new Error(`FPL API returned ${response.status}: ${response.statusText}`);
+            console.error(`[Proxy] Error: ${response.status} - ${responseText.substring(0, 100)}`);
+            return res.status(response.status).json({
+                error: `FPL API returned ${response.status}`,
+                statusText: response.statusText
+            });
         }
 
-        const data = await response.json();
+        // Parse JSON
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (e) {
+            console.error(`[Proxy] JSON parse error: ${e.message}`);
+            return res.status(502).json({
+                error: 'Invalid JSON response from FPL API',
+                message: e.message
+            });
+        }
 
-        // Set response headers
-        res.setHeader('Content-Type', 'application/json');
-        res.setHeader('Cache-Control', 'public, max-age=300'); // 5 min cache
+        // Set cache header
+        res.setHeader('Cache-Control', 'public, max-age=300');
 
-        res.status(200).json(data);
+        // Return data with CORS headers
+        return res.status(200).json(data);
+
     } catch (error) {
-        console.error('Proxy error:', error);
-        res.status(502).json({
-            error: 'Failed to fetch from FPL API',
-            message: error.message
+        console.error('[Proxy] Error:', error);
+        return res.status(502).json({
+            error: 'Proxy error',
+            message: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
 };
