@@ -34,43 +34,44 @@ const FPL_API = {
     },
 
     // Enhanced fetch with retry logic and proxy fallback
-    async fetchWithRetry(endpoint, options = {}, proxyIndex = -1) {
+    async fetchWithRetry(endpoint, options = {}) {
         let lastError;
+        const proxiesToTry = [-1, 0, 1, 2]; // -1 = direct, then try each proxy
+        
+        for (let proxyIdx = 0; proxyIdx < proxiesToTry.length; proxyIdx++) {
+            const proxyIndex = proxiesToTry[proxyIdx];
+            
+            for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
+                try {
+                    const url = this.buildUrl(endpoint, proxyIndex);
+                    const response = await fetch(url, {
+                        ...options,
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                            ...options.headers
+                        }
+                    });
 
-        for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
-            try {
-                const url = this.buildUrl(endpoint, proxyIndex);
-                const response = await fetch(url, {
-                    ...options,
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                        ...options.headers
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                     }
-                });
 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
+                    return await response.json();
+                } catch (error) {
+                    lastError = error;
+                    const proxyName = proxyIndex === -1 ? 'direct' : `proxy ${proxyIndex}`;
+                    console.warn(`[${proxyName}] Attempt ${attempt + 1} failed:`, error.message);
 
-                return await response.json();
-            } catch (error) {
-                lastError = error;
-                console.warn(`Attempt ${attempt + 1} failed for ${endpoint}:`, error.message);
-
-                // Try next proxy if current one fails
-                if (proxyIndex < this.CORS_PROXIES.length - 1) {
-                    proxyIndex++;
-                    continue;
-                }
-
-                // If all proxies fail and we haven't retried, retry with delay
-                if (attempt < this.MAX_RETRIES) {
-                    await new Promise(resolve => setTimeout(resolve, this.RETRY_DELAY));
+                    // If this is not the last attempt for this proxy, retry with delay
+                    if (attempt < this.MAX_RETRIES) {
+                        await new Promise(resolve => setTimeout(resolve, this.RETRY_DELAY));
+                    }
+                    // Otherwise, continue to next proxy
                 }
             }
         }
 
-        throw new Error(`Failed to fetch ${endpoint} after ${this.MAX_RETRIES + 1} attempts: ${lastError.message}`);
+        throw new Error(`Failed to fetch ${endpoint} after trying all proxies: ${lastError.message}`);
     },
 
     // Fetch bootstrap-static data (all players, teams, gameweeks)
