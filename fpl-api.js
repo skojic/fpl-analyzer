@@ -36,7 +36,7 @@ const FPL_API = {
     // Enhanced fetch with retry logic and proxy fallback
     async fetchWithRetry(endpoint, options = {}, proxyIndex = -1) {
         let lastError;
-        
+
         for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
             try {
                 const url = this.buildUrl(endpoint, proxyIndex);
