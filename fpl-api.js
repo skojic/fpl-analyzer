@@ -2,7 +2,7 @@
 const FPL_API = {
     BASE_URL: 'https://fantasy.premierleague.com/api',
     // Vercel serverless proxy for browser CORS support
-    VERCEL_PROXY: 'https://fpl-analyzer-proxy.vercel.app/api/proxy?url=',
+    VERCEL_PROXY: 'https://fpl-analyzer-82wvbp663-fpl-analyzer1.vercel.app/api/proxy?url=',
     // Fallback CORS proxies
     CORS_PROXIES: [
         'https://api.allorigins.win/raw?url=',
@@ -45,13 +45,13 @@ const FPL_API = {
         let lastError;
         // For browsers: try Vercel proxy first, then direct, then fallback proxies
         // For Node.js: try direct first, then fallback proxies
-        const proxiesToTry = this.IS_BROWSER 
+        const proxiesToTry = this.IS_BROWSER
             ? [-2, -1, 0, 1, 2]  // -2 = Vercel proxy, -1 = direct, then others
             : [-1, 0, 1, 2];      // direct first for Node.js
-        
+
         for (let proxyIdx = 0; proxyIdx < proxiesToTry.length; proxyIdx++) {
             const proxyIndex = proxiesToTry[proxyIdx];
-            
+
             for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
                 try {
                     const url = this.buildUrl(endpoint, proxyIndex);
