@@ -1,8 +1,15 @@
 // FPL API Integration Module
 const FPL_API = {
     BASE_URL: 'https://fantasy.premierleague.com/api',
-    CORS_PROXY: 'https://corsproxy.io/?',
+    // Multiple CORS proxies as fallbacks
+    CORS_PROXIES: [
+        'https://api.allorigins.win/raw?url=',
+        'https://corsproxy.io/?',
+        'https://cors-anywhere.herokuapp.com/'
+    ],
     TEAM_ID: parseInt(localStorage.getItem('fpl_team_id'), 10) || 1146081,
+    MAX_RETRIES: 2,
+    RETRY_DELAY: 1000, // ms
 
     // Cached data
     cache: {
@@ -12,9 +19,58 @@ const FPL_API = {
         managerHistory: null
     },
 
-    // Helper to build URL with CORS proxy
-    buildUrl(endpoint) {
-        return this.CORS_PROXY + encodeURIComponent(endpoint);
+    // Helper to build URL - tries direct access first, then CORS proxies
+    buildUrl(endpoint, proxyIndex = 0) {
+        // Try direct access first (modern FPL API allows CORS for most endpoints)
+        if (proxyIndex === -1) {
+            return endpoint;
+        }
+        // If direct fails, use CORS proxy
+        if (proxyIndex >= this.CORS_PROXIES.length) {
+            return endpoint; // fallback to direct
+        }
+        const proxy = this.CORS_PROXIES[proxyIndex];
+        return proxy + encodeURIComponent(endpoint);
+    },
+
+    // Enhanced fetch with retry logic and proxy fallback
+    async fetchWithRetry(endpoint, options = {}, proxyIndex = -1) {
+        let lastError;
+        
+        for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
+            try {
+                const url = this.buildUrl(endpoint, proxyIndex);
+                const response = await fetch(url, {
+                    ...options,
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                        ...options.headers
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return await response.json();
+            } catch (error) {
+                lastError = error;
+                console.warn(`Attempt ${attempt + 1} failed for ${endpoint}:`, error.message);
+
+                // Try next proxy if current one fails
+                if (proxyIndex < this.CORS_PROXIES.length - 1) {
+                    proxyIndex++;
+                    continue;
+                }
+
+                // If all proxies fail and we haven't retried, retry with delay
+                if (attempt < this.MAX_RETRIES) {
+                    await new Promise(resolve => setTimeout(resolve, this.RETRY_DELAY));
+                }
+            }
+        }
+
+        throw new Error(`Failed to fetch ${endpoint} after ${this.MAX_RETRIES + 1} attempts: ${lastError.message}`);
     },
 
     // Fetch bootstrap-static data (all players, teams, gameweeks)
@@ -22,14 +78,13 @@ const FPL_API = {
         if (this.cache.bootstrap) return this.cache.bootstrap;
 
         try {
-            const url = this.buildUrl(`${this.BASE_URL}/bootstrap-static/`);
-            const response = await fetch(url);
-            const data = await response.json();
+            const url = `${this.BASE_URL}/bootstrap-static/`;
+            const data = await this.fetchWithRetry(url);
             this.cache.bootstrap = data;
             return data;
         } catch (error) {
             console.error('Error fetching bootstrap data:', error);
-            throw error;
+            throw new Error('Failed to load FPL data. Please check your internet connection and try again.');
         }
     },
 
@@ -38,27 +93,25 @@ const FPL_API = {
         if (this.cache.teamData) return this.cache.teamData;
 
         try {
-            const url = this.buildUrl(`${this.BASE_URL}/entry/${this.TEAM_ID}/`);
-            const response = await fetch(url);
-            const data = await response.json();
+            const url = `${this.BASE_URL}/entry/${this.TEAM_ID}/`;
+            const data = await this.fetchWithRetry(url);
             this.cache.teamData = data;
             return data;
         } catch (error) {
             console.error('Error fetching team data:', error);
-            throw error;
+            throw new Error('Failed to load your team data. Team ID may be invalid.');
         }
     },
 
     // Fetch manager's team for current gameweek
     async getCurrentTeamPicks(gameweek) {
         try {
-            const url = this.buildUrl(`${this.BASE_URL}/entry/${this.TEAM_ID}/event/${gameweek}/picks/`);
-            const response = await fetch(url);
-            const data = await response.json();
+            const url = `${this.BASE_URL}/entry/${this.TEAM_ID}/event/${gameweek}/picks/`;
+            const data = await this.fetchWithRetry(url);
             return data;
         } catch (error) {
             console.error('Error fetching team picks:', error);
-            throw error;
+            throw new Error(`Failed to load picks for gameweek ${gameweek}`);
         }
     },
 
@@ -67,14 +120,13 @@ const FPL_API = {
         if (this.cache.managerHistory) return this.cache.managerHistory;
 
         try {
-            const url = this.buildUrl(`${this.BASE_URL}/entry/${this.TEAM_ID}/history/`);
-            const response = await fetch(url);
-            const data = await response.json();
+            const url = `${this.BASE_URL}/entry/${this.TEAM_ID}/history/`;
+            const data = await this.fetchWithRetry(url);
             this.cache.managerHistory = data;
             return data;
         } catch (error) {
             console.error('Error fetching manager history:', error);
-            throw error;
+            throw new Error('Failed to load your team history');
         }
     },
 
@@ -83,27 +135,25 @@ const FPL_API = {
         if (this.cache.fixtures) return this.cache.fixtures;
 
         try {
-            const url = this.buildUrl(`${this.BASE_URL}/fixtures/`);
-            const response = await fetch(url);
-            const data = await response.json();
+            const url = `${this.BASE_URL}/fixtures/`;
+            const data = await this.fetchWithRetry(url);
             this.cache.fixtures = data;
             return data;
         } catch (error) {
             console.error('Error fetching fixtures:', error);
-            throw error;
+            throw new Error('Failed to load fixture data');
         }
     },
 
     // Fetch player detailed data
     async getPlayerDetails(playerId) {
         try {
-            const url = this.buildUrl(`${this.BASE_URL}/element-summary/${playerId}/`);
-            const response = await fetch(url);
-            const data = await response.json();
+            const url = `${this.BASE_URL}/element-summary/${playerId}/`;
+            const data = await this.fetchWithRetry(url);
             return data;
         } catch (error) {
             console.error('Error fetching player details:', error);
-            throw error;
+            throw new Error(`Failed to load details for player ${playerId}`);
         }
     },
 
