@@ -1,10 +1,10 @@
 {
-  "functions": {
-    "api/proxy.js": {
-      "memory": 1024,
-      "maxDuration": 30
-    }
-  },
-  "buildCommand": "",
-  "outputDirectory": "."
+    "functions": {
+        "api/proxy.js": {
+            "memory": 1024,
+            "maxDuration": 30
+        }
+    },
+    "buildCommand": "",
+    "outputDirectory": "."
 }

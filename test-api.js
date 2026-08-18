@@ -34,13 +34,13 @@ const FPL_API = {
     // Enhanced fetch with retry logic and proxy fallback
     async fetchWithRetry(endpoint, options = {}, proxyIndex = -1) {
         let lastError;
-        
+
         for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
             try {
                 const url = this.buildUrl(endpoint, proxyIndex);
                 console.log(`🔄 Attempt ${attempt + 1}: Fetching from proxy ${proxyIndex >= 0 ? proxyIndex : 'direct'}...`);
                 console.log(`   URL: ${url.substring(0, 80)}...`);
-                
+
                 const response = await fetch(url, {
                     ...options,
                     headers: {
@@ -127,7 +127,7 @@ const FPL_API = {
 async function runTests() {
     console.log('🧪 FPL Analyzer API Test Suite\n');
     console.log('================================\n');
-    
+
     const tests = [
         {
             name: 'Bootstrap Static Data (Players, Teams, Gameweeks)',
@@ -149,15 +149,15 @@ async function runTests() {
     for (const test of tests) {
         console.log(`\n📋 Testing: ${test.name}`);
         console.log('─'.repeat(50));
-        
+
         try {
             const startTime = Date.now();
             const result = await test.fn();
             const duration = Date.now() - startTime;
-            
+
             console.log(`✅ PASS (${duration}ms)`);
             passed++;
-            
+
             // Show summary
             if (result.elements) {
                 console.log(`   📊 ${result.elements.length} players loaded`);
@@ -183,7 +183,7 @@ async function runTests() {
 
     console.log('\n' + '='.repeat(50));
     console.log(`\n📊 Test Results: ${passed} passed, ${failed} failed`);
-    
+
     if (failed === 0) {
         console.log('\n🎉 All tests passed! API is working correctly.');
         process.exit(0);
