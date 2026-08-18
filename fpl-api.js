@@ -1,7 +1,9 @@
 // FPL API Integration Module
 const FPL_API = {
     BASE_URL: 'https://fantasy.premierleague.com/api',
-    // Multiple CORS proxies as fallbacks
+    // Vercel serverless proxy for browser CORS support
+    VERCEL_PROXY: 'https://fpl-analyzer-proxy.vercel.app/api/proxy?url=',
+    // Fallback CORS proxies
     CORS_PROXIES: [
         'https://api.allorigins.win/raw?url=',
         'https://corsproxy.io/?',
@@ -10,6 +12,7 @@ const FPL_API = {
     TEAM_ID: parseInt(localStorage.getItem('fpl_team_id'), 10) || 1146081,
     MAX_RETRIES: 2,
     RETRY_DELAY: 1000, // ms
+    IS_BROWSER: typeof window !== 'undefined',
 
     // Cached data
     cache: {
@@ -19,9 +22,13 @@ const FPL_API = {
         managerHistory: null
     },
 
-    // Helper to build URL - tries direct access first, then CORS proxies
+    // Helper to build URL - tries Vercel proxy first (for browsers), then direct, then fallback proxies
     buildUrl(endpoint, proxyIndex = 0) {
-        // Try direct access first (modern FPL API allows CORS for most endpoints)
+        // For browser environments, try Vercel proxy first
+        if (this.IS_BROWSER && proxyIndex === -2) {
+            return this.VERCEL_PROXY + encodeURIComponent(endpoint);
+        }
+        // Try direct access
         if (proxyIndex === -1) {
             return endpoint;
         }
@@ -36,7 +43,11 @@ const FPL_API = {
     // Enhanced fetch with retry logic and proxy fallback
     async fetchWithRetry(endpoint, options = {}) {
         let lastError;
-        const proxiesToTry = [-1, 0, 1, 2]; // -1 = direct, then try each proxy
+        // For browsers: try Vercel proxy first, then direct, then fallback proxies
+        // For Node.js: try direct first, then fallback proxies
+        const proxiesToTry = this.IS_BROWSER 
+            ? [-2, -1, 0, 1, 2]  // -2 = Vercel proxy, -1 = direct, then others
+            : [-1, 0, 1, 2];      // direct first for Node.js
         
         for (let proxyIdx = 0; proxyIdx < proxiesToTry.length; proxyIdx++) {
             const proxyIndex = proxiesToTry[proxyIdx];
@@ -59,7 +70,7 @@ const FPL_API = {
                     return await response.json();
                 } catch (error) {
                     lastError = error;
-                    const proxyName = proxyIndex === -1 ? 'direct' : `proxy ${proxyIndex}`;
+                    const proxyName = proxyIndex === -2 ? 'Vercel proxy' : proxyIndex === -1 ? 'direct' : `proxy ${proxyIndex}`;
                     console.warn(`[${proxyName}] Attempt ${attempt + 1} failed:`, error.message);
 
                     // If this is not the last attempt for this proxy, retry with delay
