@@ -24,15 +24,15 @@
             <button class="back-btn" onclick="window.close()" title="Close" aria-label="Close">←</button>
             <h1 data-i18n="cardPrices">Price Changes</h1>
             <div class="lang-switcher">
-                <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English">🇬🇧</button>
-                <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski">🇷🇸</button>
+                <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English" aria-label="English">🇬🇧</button>
+                <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski" aria-label="Srpski">🇷🇸</button>
             </div>
             <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">🌙</button>
         </header>
 
         <div class="card">
             <div class="card-content" id="prices-content">
-                <div class="loading">Loading prices...</div>
+                <div class="ui-skeleton" aria-busy="true"><span class="sr-only" data-i18n="loadingText">Loading…</span><i></i><i></i><i></i></div>
             </div>
         </div>
     </div>
@@ -51,7 +51,7 @@
             const cols = [
                 [t('colName'), p => `<a href="player.html?id=${p.id}">${p.name}</a> <span style="opacity:0.6;">${p.team}</span>`],
                 [t('colPrice'), p => `£${safeNumber(p.price, 1)}m`],
-                sell && [t('sellPrice'), p => `£${safeNumber(sell[p.id], 1)}m`],
+                sell && [UI.term('sell', t('sellPrice')), p => `£${safeNumber(sell[p.id], 1)}m`],
                 !compact && [t('pcNow'), p => progress(p.priceChangePercent)],
                 [t('pcTonight'), p => progress(tonight(p))],
                 !compact && [t('pcThisGW'), p => change(p.costChangeEvent)],
@@ -94,7 +94,7 @@
                 </div>`;
                 content.innerHTML = html;
             } catch (error) {
-                content.innerHTML = `<div class="loading">${t('errorPrices')}</div>`;
+                content.innerHTML = `${UI.state('error', t('errorPrices'))}`;
                 console.error(error);
             }
         }

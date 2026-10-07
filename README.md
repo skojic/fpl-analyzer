@@ -105,8 +105,9 @@ Link to the APP: https://fpl-analyzer-eosin.vercel.app/
 ## UI / UX Features
 
 ### 🌙 Dark / Light Theme
-- Toggle between dark and light mode with the moon/sun button in the header
-- Preference is saved in the browser and applied instantly on next visit with no flash
+- Follows your system's light / dark setting until you choose one with the moon/sun button in the header
+- Your choice is saved in the browser and applied instantly on the next visit with no flash
+- Theme colours are checked for WCAG AA contrast in both modes (`node scripts/contrast.js`, also part of `npm test`)
 
 ### 🌐 Bilingual Support (English / Serbian)
 - Full translation of the entire UI via `lang.js`
@@ -148,7 +149,9 @@ Link to the APP: https://fpl-analyzer-eosin.vercel.app/
 
 5. **Explanations**
    - **ⓘ** on a card, or **How this page works** under a page header, explains what it shows and how it is calculated
-   - **Guide** in the navigation bar lists every card and page with the same explanations
+   - **Guide** in the navigation bar lists every card and page with the same explanations, plus a glossary (xPts, EO, swing, FDR, BPS, defensive contribution, free transfers, hits, selling price, blanks and doubles)
+   - Underlined terms in tables (e.g. **EO**, **Swing**, **xPts**) show their definition when tapped
+   - Each Home card ends with where its numbers come from and when they were updated (live FPL data, the daily recent-form build, bookmaker odds)
 
 6. **Players**
    - The Players tab has the database (search, filter, sort), the comparison of up to 3 players and price changes; click a player for the full profile
@@ -192,6 +195,7 @@ fpl-analyzer/
 ├── scripts/backtest.js     # Model accuracy backtest (`npm run backtest`)
 ├── scripts/build-data.js   # Recent form for every player + top-1,000 ownership
 ├── scripts/build-odds.js   # Bookmaker odds → expected goals (The Odds API, free tier)
+├── scripts/contrast.js     # WCAG contrast check of the theme colours
 ├── data/                   # accuracy.json, recent-form.json, ownership.json, odds.json (refreshed daily)
 ├── .github/workflows/data.yml  # Free daily data refresh
 ├── vercel.json             # Vercel project config

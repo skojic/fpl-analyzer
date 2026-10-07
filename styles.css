@@ -46,7 +46,7 @@
     --gradient-grass: linear-gradient(180deg, #1a6b2e 0%, #2d8f3f 50%, #1a6b2e 100%);
 
     /* Semantic colours: use these instead of hex values in pages and scripts */
-    --positive: #16a34a;            /* gains, rises, good */
+    --positive: #15803d;            /* gains, rises, good (deep enough for small text on white) */
     --negative: #e0004d;            /* losses, falls, hits */
     --warning: #d97706;
     --neutral: #9ca3af;

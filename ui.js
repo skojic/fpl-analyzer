@@ -51,6 +51,45 @@ const UI = {
         </div>`;
     },
 
+    // "today 05:53" / "7 Oct 05:53" in the current language
+    when(date) {
+        if (!date) return '';
+        const d = new Date(date);
+        const locale = window.LANG === 'sr' ? 'sr-Latn' : 'en-GB';
+        const time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+        return d.toDateString() === new Date().toDateString()
+            ? `${t('ftToday')} ${time}`
+            : `${d.toLocaleDateString(locale, { day: 'numeric', month: 'short' })} ${time}`;
+    },
+
+    // Where a card's numbers come from and how fresh they are
+    footer(parts) {
+        const text = parts.filter(Boolean).join(' · ');
+        return text ? `<div class="card-footer">${text}</div>` : '';
+    },
+
+    // Freshness of the projection inputs (recent form and bookmaker odds), for cards built on projections
+    projectionSources() {
+        const info = (typeof Predictor !== 'undefined' && Predictor.dataInfo) || {};
+        return [
+            `${t('ftFpl')} ${UI.when(new Date())}`,
+            info.form ? `${t('ftForm')} ${UI.when(info.form)}` : '',
+            info.odds ? `${t('ftOdds')} ${UI.when(info.odds.generated)}` : ''
+        ];
+    },
+
+    // Placeholder while a card or page loads
+    skeleton(lines = 3) {
+        return `<div class="ui-skeleton" aria-busy="true"><span class="sr-only">${t('loadingText')}</span>${'<i></i>'.repeat(lines)}</div>`;
+    },
+
+    // Empty or error message; errors offer a retry
+    state(kind, message) {
+        const icon = kind === 'error' ? '!' : 'i';
+        const retry = kind === 'error' ? ` <button class="ui-chip" type="button" onclick="location.reload()">${t('retry')}</button>` : '';
+        return `<div class="ui-state ui-state-${kind}" role="${kind === 'error' ? 'alert' : 'status'}"><span class="ui-state-icon" aria-hidden="true">${icon}</span><div>${message}${retry}</div></div>`;
+    },
+
     // Small heading inside a card
     subtitle(text) {
         return `<h4 class="card-subtitle">${text}</h4>`;
@@ -89,7 +128,8 @@ const UI = {
         }).join('');
 
         return `
-            <div class="field-player player-clickable" onclick="UI.go('player.html?id=${player.id}')" title="View ${player.name} profile">
+            <div class="field-player player-clickable" role="link" tabindex="0" aria-label="${UI.esc(player.name)}, ${points} pts"
+                 onclick="UI.go('player.html?id=${player.id}')" onkeydown="if(event.key==='Enter')UI.go('player.html?id=${player.id}')" title="View ${player.name} profile">
                 <div class="player-shirt-box${avail ? ` flag-${avail.level}` : ''}">
                     <div class="player-shirt ${captainClass}">${kitImg}</div>
                     <div class="player-name-field">${player.name}</div>
@@ -102,14 +142,46 @@ const UI = {
     }
 };
 
+// ── Icons: simple line icons drawn for this app (24×24, stroke = current text colour) ──
+UI.ICONS = {
+    home: '<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
+    shirt: '<path d="M8 3L3 6l2 5 3-1v11h8V10l3 1 2-5-5-3a4 4 0 0 1-8 0z"/>',
+    transfers: '<path d="M4 8h13M14 5l3 3-3 3M20 16H7M10 13l-3 3 3 3"/>',
+    trophy: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/>',
+    players: '<circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><circle cx="17" cy="9" r="2.5"/><path d="M16.5 14a5 5 0 0 1 4.5 5"/>',
+    calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+    plan: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M9 15l2 2 4-4"/>',
+    live: '<circle cx="12" cy="12" r="2.5" fill="currentColor"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M5 5a10 10 0 0 0 0 14M19 5a10 10 0 0 1 0 14"/>',
+    target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/>',
+    chips: '<path d="M11 3l1.8 4.7 4.7 1.8-4.7 1.8L11 16l-1.8-4.7L4.5 9.5l4.7-1.8zM18 14l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z"/>',
+    prices: '<path d="M3 17l6-6 4 4 8-8M15 7h6v6"/>',
+    guide: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/>'
+};
+
+UI.icon = function (name) {
+    return `<svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-${name}"/></svg>`;
+};
+
+// Sprite with every icon, added once per page
+UI.addIconSprite = function () {
+    if (document.getElementById('ui-icons')) return;
+    const sprite = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    sprite.id = 'ui-icons';
+    sprite.setAttribute('aria-hidden', 'true');
+    sprite.style.display = 'none';
+    sprite.innerHTML = Object.entries(UI.ICONS).map(([name, body]) =>
+        `<symbol id="i-${name}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</symbol>`).join('');
+    document.body.insertBefore(sprite, document.body.firstChild);
+};
+
 // ── App navigation: tabs on top (bottom bar on phones), sub-pages as pills, same-tab links ──
 UI.TABS = [
-    { key: 'home', icon: '🏠', label: 'navHome', pages: [['index.html', 'navHome']] },
-    { key: 'team', icon: '⚽', label: 'navTeam', pages: [['team.html', 'cardMyTeam'], ['prediction.html', 'cardPrediction']] },
-    { key: 'transfers', icon: '🔄', label: 'navTransfers', pages: [['transfers.html', 'cardTransfers'], ['optimizer.html', 'cardOptimizer']] },
-    { key: 'league', icon: '🏆', label: 'navLeague', pages: [['league.html', 'cardLeague'], ['live.html', 'cardLive'], ['performance.html', 'cardPerformance']] },
-    { key: 'players', icon: '🗂️', label: 'navPlayers', pages: [['database.html', 'cardDatabase'], ['comparison.html', 'cardComparison'], ['prices.html', 'cardPrices'], ['player.html', null]] },
-    { key: 'fixtures', icon: '📅', label: 'navFixtures', pages: [['fixtures.html', 'cardFixtures']] }
+    { key: 'home', icon: 'home', label: 'navHome', pages: [['index.html', 'navHome']] },
+    { key: 'team', icon: 'shirt', label: 'navTeam', pages: [['team.html', 'cardMyTeam'], ['prediction.html', 'cardPrediction']] },
+    { key: 'transfers', icon: 'transfers', label: 'navTransfers', pages: [['transfers.html', 'cardTransfers'], ['optimizer.html', 'cardOptimizer']] },
+    { key: 'league', icon: 'trophy', label: 'navLeague', pages: [['league.html', 'cardLeague'], ['live.html', 'cardLive'], ['performance.html', 'cardPerformance']] },
+    { key: 'players', icon: 'players', label: 'navPlayers', pages: [['database.html', 'cardDatabase'], ['comparison.html', 'cardComparison'], ['prices.html', 'cardPrices'], ['player.html', null]] },
+    { key: 'fixtures', icon: 'calendar', label: 'navFixtures', pages: [['fixtures.html', 'cardFixtures']] }
 ];
 
 UI.currentPage = function () {
@@ -129,10 +201,10 @@ UI.renderNav = function () {
         <a class="app-nav-brand" href="index.html">FPL Analyzer</a>
         <div class="app-nav-tabs">
             ${UI.TABS.map(tab => `<a class="app-nav-tab${tab === active ? ' active' : ''}" href="${tab.pages[0][0]}"${tab === active ? ' aria-current="page"' : ''}>
-                <span class="app-nav-icon" aria-hidden="true">${tab.icon}</span><span class="app-nav-label" data-i18n="${tab.label}">${t(tab.label)}</span></a>`).join('')}
+                <span class="app-nav-icon">${UI.icon(tab.icon)}</span><span class="app-nav-label" data-i18n="${tab.label}">${t(tab.label)}</span></a>`).join('')}
         </div>
         <button class="app-nav-guide" type="button" onclick="UI.openGuide()" aria-label="${t('navGuide')}">
-            <span aria-hidden="true">?</span><span class="app-nav-label" data-i18n="navGuide">${t('navGuide')}</span>
+            ${UI.icon('guide')}<span class="app-nav-label" data-i18n="navGuide">${t('navGuide')}</span>
         </button>`;
     document.body.insertBefore(nav, document.body.firstChild);
     document.body.classList.add('has-app-nav');
@@ -180,17 +252,40 @@ UI.infoButton = function (key) {
 
 UI.closeInfo = function () {
     document.querySelectorAll('.ui-popover').forEach(el => el.remove());
-    document.querySelectorAll('.ui-info[aria-expanded="true"]').forEach(el => el.setAttribute('aria-expanded', 'false'));
+    document.querySelectorAll('[aria-expanded="true"]').forEach(el => {
+        if (el.matches('.ui-info, .ui-term, .app-subnav-info')) el.setAttribute('aria-expanded', 'false');
+    });
 };
 
 UI.toggleInfo = function (button, key) {
+    UI.popover(button, UI.guideText(key));
+};
+
+// Glossary terms: key -> lang keys gl_<key>_term / gl_<key>_def
+UI.GLOSSARY = ['xpts', 'xg', 'xgc', 'eo', 'swing', 'multiplier', 'fdr', 'bps', 'defcon', 'ft', 'hit', 'sell', 'blank'];
+
+UI.termText = function (key) {
+    return `<p><strong>${t(`gl_${key}_term`)}</strong>: ${t(`gl_${key}_def`)}</p>`;
+};
+
+// A term (e.g. a table header) that explains itself when tapped
+UI.term = function (key, label = null) {
+    return `<button class="ui-term" type="button" aria-expanded="false" onclick="event.stopPropagation(); UI.toggleTerm(this, '${key}')">${label || t(`gl_${key}_term`)}</button>`;
+};
+
+UI.toggleTerm = function (button, key) {
+    UI.popover(button, UI.termText(key));
+};
+
+// Popover anchored under a button; a second click on the same button closes it
+UI.popover = function (button, html) {
     const open = button.getAttribute('aria-expanded') === 'true';
     UI.closeInfo();
     if (open) return;
     const pop = document.createElement('div');
     pop.className = 'ui-popover';
     pop.setAttribute('role', 'dialog');
-    pop.innerHTML = UI.guideText(key);
+    pop.innerHTML = html;
     document.body.appendChild(pop);
     const r = button.getBoundingClientRect();
     const width = Math.min(340, window.innerWidth - 24);
@@ -218,6 +313,9 @@ UI.openGuide = function () {
                 <h3>${t(title)}${page !== 'player.html' ? ` <a href="${page}">${t('guideOpen')} →</a>` : ''}</h3>
                 ${UI.guideText(key)}
             </section>`).join('')}
+            <section class="ui-guide-item"><h3>${t('glossaryTitle')}</h3>
+                ${UI.GLOSSARY.map(key => UI.termText(key)).join('')}
+            </section>
         </div>`;
     overlay.addEventListener('click', e => { if (e.target === overlay) UI.closeGuide(); });
     document.body.appendChild(overlay);
@@ -237,6 +335,7 @@ UI.go = function (href) {
 
 if (typeof document !== 'undefined') {
     document.addEventListener('DOMContentLoaded', () => {
+        UI.addIconSprite();
         UI.renderNav();
     });
     document.addEventListener('click', e => { if (!e.target.closest('.ui-popover')) UI.closeInfo(); });

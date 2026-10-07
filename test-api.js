@@ -9,6 +9,7 @@ global.Predictor = Predictor; // league.js expects the browser global
 const League = require('./league.js');
 const Live = require('./live.js');
 const Odds = require('./scripts/build-odds.js');
+const Contrast = require('./scripts/contrast.js');
 const proxy = require('./api/proxy.js');
 
 // Minimal stand-in for Vercel's request/response objects
@@ -226,6 +227,11 @@ const tests = [
         const between = (x, lo, hi) => x >= Math.min(lo, hi) - 1e-9 && x <= Math.max(lo, hi) + 1e-9;
         if (!b.fromOdds || !between(b.scored, a.scored, target)) throw new Error(`blend ${b.scored} not between ${a.scored} and ${target}`);
         return `home xG ${a.scored.toFixed(2)} (model) -> ${b.scored.toFixed(2)} (odds ${target.toFixed(2)})`;
+    }],
+    ['Design: theme colours meet WCAG AA contrast in light and dark', async () => {
+        const failed = Contrast.check().filter(r => !r.ok);
+        if (failed.length) throw new Error(failed.map(r => `${r.theme} ${r.what}: ${r.ratio} < ${r.min}`).join('; '));
+        return `${Contrast.check().length} pairs`;
     }],
     ['Model: return date parsing', async () => {
         const d = Predictor.parseReturnDate('Hamstring injury - Expected back 18 Oct');

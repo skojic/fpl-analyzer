@@ -116,6 +116,7 @@ const Predictor = {
 
     contexts: {},           // shared fixtures / team ratings per horizon length, built once per page load
     publishedFormLoaded: false,
+    dataInfo: {},           // when the published data files were built (shown on the cards)
     recentForm: {},         // playerId -> minutes profile from recent matches (null when unavailable)
 
     // ── Context: horizon, fixtures per team and gameweek, team strength ────
@@ -144,7 +145,9 @@ const Predictor = {
                     data = JSON.parse(require('fs').readFileSync(file, 'utf8'));
                 }
                 const ageDays = (Date.now() - new Date(data.generated).getTime()) / 86400000;
-                return ageDays <= this.ODDS_MAX_AGE_DAYS ? data.fixtures || {} : {};
+                if (ageDays > this.ODDS_MAX_AGE_DAYS) return {};
+                this.dataInfo.odds = { generated: data.generated, matches: Object.keys(data.fixtures || {}).length };
+                return data.fixtures || {};
             } catch (error) {
                 console.error('Odds unavailable:', error.message);
                 return {};
@@ -271,6 +274,7 @@ const Predictor = {
             const data = await response.json();
             const lastFinished = Math.max(0, ...bootstrap.events.filter(e => e.finished).map(e => e.id));
             if (data.lastFinishedEvent !== lastFinished) return;
+            this.dataInfo.form = data.generated;
             for (const [id, form] of Object.entries(data.players)) {
                 if (!(id in this.recentForm)) this.recentForm[id] = form;
             }

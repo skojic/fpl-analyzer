@@ -8,14 +8,22 @@
     const DARK = 'dark';
     const LIGHT = 'light';
 
+    const systemDark = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+
+    // The user's choice once they have toggled; until then the system setting
     function getSaved() {
-        try { return localStorage.getItem(STORAGE_KEY) || LIGHT; }
-        catch (e) { return LIGHT; }
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved === DARK || saved === LIGHT) return saved;
+        } catch (e) {}
+        return systemDark && systemDark.matches ? DARK : LIGHT;
     }
 
-    function apply(theme) {
+    function apply(theme, remember) {
         document.documentElement.setAttribute('data-theme', theme);
-        try { localStorage.setItem(STORAGE_KEY, theme); } catch (e) {}
+        if (remember) {
+            try { localStorage.setItem(STORAGE_KEY, theme); } catch (e) {}
+        }
         updateButton(theme);
     }
 
@@ -35,7 +43,12 @@
     }
 
     // Apply immediately (suppresses flash of wrong theme)
-    apply(getSaved());
+    apply(getSaved(), false);
+
+    // Follow the system setting while the user hasn't chosen
+    if (systemDark && systemDark.addEventListener) {
+        systemDark.addEventListener('change', function () { apply(getSaved(), false); });
+    }
 
     // After DOM is ready, sync the button label (it wasn't in DOM during the
     // initial apply() call above since this script is in <head>)
@@ -46,6 +59,6 @@
     // Public toggle function called by all toggle buttons
     window.toggleTheme = function () {
         const current = document.documentElement.getAttribute('data-theme') || LIGHT;
-        apply(current === DARK ? LIGHT : DARK);
+        apply(current === DARK ? LIGHT : DARK, true);
     };
 }());

@@ -353,8 +353,8 @@
                 <p class="guardian-tip" data-i18n-html="guardianTip"></p>
             </details>
             <div class="guardian-lang">
-                <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English">🇬🇧</button>
-                <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski">🇷🇸</button>
+                <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English" aria-label="English">🇬🇧</button>
+                <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski" aria-label="Srpski">🇷🇸</button>
             </div>
         </div>
     </div>
@@ -370,8 +370,8 @@
                 <p class="team-subtitle" id="team-subtitle"></p>
             </div>
             <div class="lang-switcher">
-                <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English">🇬🇧</button>
-                <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski">🇷🇸</button>
+                <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English" aria-label="English">🇬🇧</button>
+                <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski" aria-label="Srpski">🇷🇸</button>
             </div>
             <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">🌙</button>
             <span id="tid-badge"></span>
@@ -381,98 +381,98 @@
         <div class="home-grid">
             <div class="card home-card" data-card="live">
                 <div class="card-header">
-                    <h2><span class="card-icon" aria-hidden="true">🔴</span><span data-i18n="cardLive">Live Gameweek</span></h2>
+                    <h2><span class="card-icon"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-live"/></svg></span><span data-i18n="cardLive">Live Gameweek</span></h2>
                     <div class="card-actions">
-                        <button class="ui-info" type="button" aria-label="How it works" aria-expanded="false" onclick="event.stopPropagation(); UI.toggleInfo(this, 'live')">i</button>
+                        <button class="ui-info" type="button" aria-label="How it works" data-i18n="guideHow" data-i18n-attr="aria-label" aria-expanded="false" onclick="event.stopPropagation(); UI.toggleInfo(this, 'live')">i</button>
                         <a class="card-open" href="live.html"><span data-i18n="guideOpen">Open</span> →</a>
                     </div>
                 </div>
                 <div class="card-content" id="live-content">
-                    <div class="loading" data-i18n="loadingLive">Loading...</div>
+                    <div class="ui-skeleton" aria-busy="true"><span class="sr-only" data-i18n="loadingText">Loading…</span><i></i><i></i><i></i></div>
                 </div>
             </div>
             <div class="card home-card" data-card="team">
                 <div class="card-header">
-                    <h2><span class="card-icon" aria-hidden="true">⚽</span><span data-i18n="cardMyTeam">My Team</span></h2>
+                    <h2><span class="card-icon"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-shirt"/></svg></span><span data-i18n="cardMyTeam">My Team</span></h2>
                     <div class="card-actions">
-                        <button class="ui-info" type="button" aria-label="How it works" aria-expanded="false" onclick="event.stopPropagation(); UI.toggleInfo(this, 'team')">i</button>
+                        <button class="ui-info" type="button" aria-label="How it works" data-i18n="guideHow" data-i18n-attr="aria-label" aria-expanded="false" onclick="event.stopPropagation(); UI.toggleInfo(this, 'team')">i</button>
                         <a class="card-open" href="team.html"><span data-i18n="guideOpen">Open</span> →</a>
                     </div>
                 </div>
                 <div class="card-content" id="team-content">
-                    <div class="loading">Loading...</div>
+                    <div class="ui-skeleton" aria-busy="true"><span class="sr-only" data-i18n="loadingText">Loading…</span><i></i><i></i><i></i></div>
                 </div>
             </div>
             <div class="card home-card" data-card="captain">
                 <div class="card-header">
-                    <h2><span class="card-icon" aria-hidden="true">🎯</span><span data-i18n="cardCaptain">Captain & Predictions</span></h2>
+                    <h2><span class="card-icon"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-target"/></svg></span><span data-i18n="cardCaptain">Captain & Predictions</span></h2>
                     <div class="card-actions">
-                        <button class="ui-info" type="button" aria-label="How it works" aria-expanded="false" onclick="event.stopPropagation(); UI.toggleInfo(this, 'prediction')">i</button>
+                        <button class="ui-info" type="button" aria-label="How it works" data-i18n="guideHow" data-i18n-attr="aria-label" aria-expanded="false" onclick="event.stopPropagation(); UI.toggleInfo(this, 'prediction')">i</button>
                         <a class="card-open" href="prediction.html"><span data-i18n="guideOpen">Open</span> →</a>
                     </div>
                 </div>
                 <div class="card-content" id="prediction-content">
-                    <div class="loading">Loading...</div>
+                    <div class="ui-skeleton" aria-busy="true"><span class="sr-only" data-i18n="loadingText">Loading…</span><i></i><i></i><i></i></div>
                 </div>
             </div>
             <div class="card home-card" data-card="plan">
                 <div class="card-header">
-                    <h2><span class="card-icon" aria-hidden="true">🗓️</span><span data-i18n="cardPlan">Transfer Plan</span></h2>
+                    <h2><span class="card-icon"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-plan"/></svg></span><span data-i18n="cardPlan">Transfer Plan</span></h2>
                     <div class="card-actions">
-                        <button class="ui-info" type="button" aria-label="How it works" aria-expanded="false" onclick="event.stopPropagation(); UI.toggleInfo(this, 'transfers')">i</button>
+                        <button class="ui-info" type="button" aria-label="How it works" data-i18n="guideHow" data-i18n-attr="aria-label" aria-expanded="false" onclick="event.stopPropagation(); UI.toggleInfo(this, 'transfers')">i</button>
                         <a class="card-open" href="transfers.html"><span data-i18n="guideOpen">Open</span> →</a>
                     </div>
                 </div>
                 <div class="card-content" id="transfers-content">
-                    <div class="loading" data-i18n="loadingTransfers">Loading...</div>
+                    <div class="ui-skeleton" aria-busy="true"><span class="sr-only" data-i18n="loadingText">Loading…</span><i></i><i></i><i></i></div>
                 </div>
             </div>
             <div class="card home-card" data-card="league">
                 <div class="card-header">
-                    <h2><span class="card-icon" aria-hidden="true">🏆</span><span data-i18n="cardLeague">Mini-League</span></h2>
+                    <h2><span class="card-icon"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-trophy"/></svg></span><span data-i18n="cardLeague">Mini-League</span></h2>
                     <div class="card-actions">
-                        <button class="ui-info" type="button" aria-label="How it works" aria-expanded="false" onclick="event.stopPropagation(); UI.toggleInfo(this, 'league')">i</button>
+                        <button class="ui-info" type="button" aria-label="How it works" data-i18n="guideHow" data-i18n-attr="aria-label" aria-expanded="false" onclick="event.stopPropagation(); UI.toggleInfo(this, 'league')">i</button>
                         <a class="card-open" href="league.html"><span data-i18n="guideOpen">Open</span> →</a>
                     </div>
                 </div>
                 <div class="card-content" id="league-content">
-                    <div class="loading" data-i18n="loadingLeague">Loading...</div>
+                    <div class="ui-skeleton" aria-busy="true"><span class="sr-only" data-i18n="loadingText">Loading…</span><i></i><i></i><i></i></div>
                 </div>
             </div>
             <div class="card home-card" data-card="chips">
                 <div class="card-header">
-                    <h2><span class="card-icon" aria-hidden="true">🤖</span><span data-i18n="cardOptimizer">AI Team & Chips</span></h2>
+                    <h2><span class="card-icon"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-chips"/></svg></span><span data-i18n="cardOptimizer">AI Team & Chips</span></h2>
                     <div class="card-actions">
-                        <button class="ui-info" type="button" aria-label="How it works" aria-expanded="false" onclick="event.stopPropagation(); UI.toggleInfo(this, 'optimizer')">i</button>
+                        <button class="ui-info" type="button" aria-label="How it works" data-i18n="guideHow" data-i18n-attr="aria-label" aria-expanded="false" onclick="event.stopPropagation(); UI.toggleInfo(this, 'optimizer')">i</button>
                         <a class="card-open" href="optimizer.html"><span data-i18n="guideOpen">Open</span> →</a>
                     </div>
                 </div>
                 <div class="card-content" id="optimizer-content">
-                    <div class="loading" data-i18n="opLoading">Loading...</div>
+                    <div class="ui-skeleton" aria-busy="true"><span class="sr-only" data-i18n="loadingText">Loading…</span><i></i><i></i><i></i></div>
                 </div>
             </div>
             <div class="card home-card" data-card="prices">
                 <div class="card-header">
-                    <h2><span class="card-icon" aria-hidden="true">💷</span><span data-i18n="cardPrices">Price Changes</span></h2>
+                    <h2><span class="card-icon"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-prices"/></svg></span><span data-i18n="cardPrices">Price Changes</span></h2>
                     <div class="card-actions">
-                        <button class="ui-info" type="button" aria-label="How it works" aria-expanded="false" onclick="event.stopPropagation(); UI.toggleInfo(this, 'prices')">i</button>
+                        <button class="ui-info" type="button" aria-label="How it works" data-i18n="guideHow" data-i18n-attr="aria-label" aria-expanded="false" onclick="event.stopPropagation(); UI.toggleInfo(this, 'prices')">i</button>
                         <a class="card-open" href="prices.html"><span data-i18n="guideOpen">Open</span> →</a>
                     </div>
                 </div>
                 <div class="card-content" id="prices-content">
-                    <div class="loading" data-i18n="loadingPrices">Loading...</div>
+                    <div class="ui-skeleton" aria-busy="true"><span class="sr-only" data-i18n="loadingText">Loading…</span><i></i><i></i><i></i></div>
                 </div>
             </div>
             <div class="card home-card" data-card="fixtures">
                 <div class="card-header">
-                    <h2><span class="card-icon" aria-hidden="true">📅</span><span data-i18n="cardFixtures">Fixture Analyser</span></h2>
+                    <h2><span class="card-icon"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-calendar"/></svg></span><span data-i18n="cardFixtures">Fixture Analyser</span></h2>
                     <div class="card-actions">
-                        <button class="ui-info" type="button" aria-label="How it works" aria-expanded="false" onclick="event.stopPropagation(); UI.toggleInfo(this, 'fixtures')">i</button>
+                        <button class="ui-info" type="button" aria-label="How it works" data-i18n="guideHow" data-i18n-attr="aria-label" aria-expanded="false" onclick="event.stopPropagation(); UI.toggleInfo(this, 'fixtures')">i</button>
                         <a class="card-open" href="fixtures.html"><span data-i18n="guideOpen">Open</span> →</a>
                     </div>
                 </div>
                 <div class="card-content" id="fixtures-content">
-                    <div class="loading" data-i18n="loadingFixtures">Loading...</div>
+                    <div class="ui-skeleton" aria-busy="true"><span class="sr-only" data-i18n="loadingText">Loading…</span><i></i><i></i><i></i></div>
                 </div>
             </div>
         </div>

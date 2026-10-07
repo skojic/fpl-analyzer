@@ -128,27 +128,17 @@ async function loadMyTeam() {
 
         // Team statistics
         if (teamData.entryHistory) {
-            html += `
-                <div class="stats-grid" style="margin-top: 20px;">
-                    <div class="stat-card">
-                        <div class="stat-card-value">${teamData.entryHistory.points}</div>
-                        <div class="stat-card-label">${t('gwPoints')}</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-card-value">£${(teamData.entryHistory.bank / 10).toFixed(1)}m</div>
-                        <div class="stat-card-label">${t('bank')}</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-card-value">£${(teamData.entryHistory.value / 10).toFixed(1)}m</div>
-                        <div class="stat-card-label">${t('teamValue')}</div>
-                    </div>
-                </div>
-            `;
+            html += UI.stats([
+                [teamData.entryHistory.points, t('gwPoints')],
+                [`£${safeNumber(teamData.entryHistory.bank / 10, 1)}m`, t('bank')],
+                [`£${safeNumber(teamData.entryHistory.value / 10, 1)}m`, t('teamValue')]
+            ]);
         }
+        html += UI.footer([`${t('ftFpl')} ${UI.when(new Date())}`]);
 
         content.innerHTML = html;
     } catch (error) {
-        content.innerHTML = `<div class="loading">${t('errorTeam')}</div>`;
+        content.innerHTML = `${UI.state('error', t('errorTeam'))}`;
         console.error(error);
     }
 }
@@ -183,11 +173,12 @@ async function loadPredictions() {
                 title: `${p.player.name}${p === captain ? ' (C)' : p === vice ? ' (V)' : ''}`,
                 meta: `${p.player.team} • ${p.player.position}`,
                 value: safeNumber(p.expectedPoints, 1),
-                label: 'xPts',
+                label: UI.term('xpts'),
                 href: `player.html?id=${p.player.id}`
-            })).join('');
+            })).join('')
+            + UI.footer(UI.projectionSources());
     } catch (error) {
-        content.innerHTML = `<div class="loading">${t('errorPredictions')}</div>`;
+        content.innerHTML = `${UI.state('error', t('errorPredictions'))}`;
         console.error(error);
     }
 }
@@ -205,12 +196,12 @@ async function loadTransferSuggestions() {
         const plan = await Predictor.planTransfers(appData.myTeam, appData.allPlayers, bank, FPL_API.getPlanPrefs());
 
         if (!plan.steps.length) {
-            content.innerHTML = `<div class="loading">${t('noTransfers')}</div>`;
+            content.innerHTML = `${UI.state('empty', t('noTransfers'))}`;
             return;
         }
         content.innerHTML = UI.stats([
             [UI.signed(plan.gain), t('planVsRoll')],
-            [plan.freeTransfers, t('freeTransfers')],
+            [plan.freeTransfers, UI.term('ft', t('freeTransfers'))],
             [`£${safeNumber(plan.bank, 1)}m`, t('budget')]
         ])
             + plan.steps.map(step => UI.row({
@@ -218,9 +209,10 @@ async function loadTransferSuggestions() {
                 meta: step.moves.length ? step.moves.map(m => `${m.out.name} → ${m.in.name}`).join(', ') : t('planRoll'),
                 value: step.hit ? `−${step.hit}` : '',
                 tone: step.hit ? 'down' : ''
-            })).join('');
+            })).join('')
+            + UI.footer(UI.projectionSources());
     } catch (error) {
-        content.innerHTML = `<div class="loading">${t('errorTransfers')}</div>`;
+        content.innerHTML = `${UI.state('error', t('errorTransfers'))}`;
         console.error(error);
     }
 }
@@ -233,7 +225,7 @@ async function loadLeagueCard() {
     try {
         const leagues = await League.getMyLeagues();
         if (!leagues.length) {
-            content.innerHTML = `<div class="loading">${t('leagueNone')}</div>`;
+            content.innerHTML = `${UI.state('empty', t('leagueNone'))}`;
             return;
         }
         const a = await League.analyze(leagues[0].id);
@@ -244,7 +236,7 @@ async function loadLeagueCard() {
             meta: `${r.player.team} • EO ${Math.round(r.eo * 100)}% • ${t('leagueYours')} ${r.yours ? `×${r.yours}` : '–'}`,
             value: UI.signed(r.exposure, 1, { colour: false }),
             tone: r.exposure < 0 ? 'down' : 'up',
-            label: t('leagueSwing')
+            label: UI.term('swing', t('leagueSwing'))
         });
 
         content.innerHTML = UI.stats([
@@ -252,9 +244,10 @@ async function loadLeagueCard() {
             [gap === null ? '–' : gap, t('leagueGap')]
         ])
             + (a.threats.length ? UI.subtitle(t('leagueThreats')) + a.threats.slice(0, 3).map(row).join('') : '')
-            + (a.differentials.length ? UI.subtitle(t('leagueDiffs')) + a.differentials.slice(0, 1).map(row).join('') : '');
+            + (a.differentials.length ? UI.subtitle(t('leagueDiffs')) + a.differentials.slice(0, 1).map(row).join('') : '')
+            + UI.footer([`${t('leagueBasedOn')} ${a.gameweek}`, `${a.rivalsSampled} ${t('leagueSampled')}`]);
     } catch (error) {
-        content.innerHTML = `<div class="loading">${t('errorLeague')}</div>`;
+        content.innerHTML = `${UI.state('error', t('errorLeague'))}`;
         console.error(error);
     }
 }
@@ -267,7 +260,7 @@ async function loadFixturesCard() {
     try {
         const ticker = await Predictor.getFixtureTicker(5);
         if (!ticker.events.length) {
-            content.innerHTML = `<div class="loading">${t('fxNone')}</div>`;
+            content.innerHTML = `${UI.state('empty', t('fxNone'))}`;
             return;
         }
         const total = (row, fn) => row.cells.reduce((sum, cell) => sum + cell.reduce((s, c) => s + fn(c), 0), 0);
@@ -280,9 +273,11 @@ async function loadFixturesCard() {
             <div class="ui-grid-2">
                 <div>${list(t('fxBestAttack'), c => c.xgFor, 'xG')}</div>
                 <div>${list(t('fxBestDefence'), c => c.csProb, 'CS')}</div>
-            </div>`;
+            </div>`
+            + UI.footer(UI.projectionSources().slice(0, 1).concat(Predictor.dataInfo.odds
+                ? `${t('ftOdds')} ${UI.when(Predictor.dataInfo.odds.generated)} (${Predictor.dataInfo.odds.matches})` : []));
     } catch (error) {
-        content.innerHTML = `<div class="loading">${t('errorFixtures')}</div>`;
+        content.innerHTML = `${UI.state('error', t('errorFixtures'))}`;
         console.error(error);
     }
 }
@@ -300,7 +295,7 @@ async function loadOptimizerCard() {
             Predictor.getChipCalendar(teamData.picks, allPlayers, bank)
         ]);
         if (!report) {
-            content.innerHTML = `<div class="loading">${t('fxNone')}</div>`;
+            content.innerHTML = `${UI.state('empty', t('fxNone'))}`;
             return;
         }
         const names = { freehit: t('chipFreeHit'), bboost: t('chipBenchBoost'), '3xc': t('chipTripleCaptain') };
@@ -313,9 +308,10 @@ async function loadOptimizerCard() {
                     const week = calendar.weeks.find(w => w.gameweek === gw);
                     return UI.row({ title: names[chip], meta: `GW${gw}`, value: `+${safeNumber(week[chip], 1)}`, label: t('opPts') });
                 }).join('')
-                : '');
+                : '')
+            + UI.footer(UI.projectionSources());
     } catch (error) {
-        content.innerHTML = `<div class="loading">${t('errorOptimizer')}</div>`;
+        content.innerHTML = `${UI.state('error', t('errorOptimizer'))}`;
         console.error(error);
     }
 }
@@ -347,10 +343,11 @@ async function loadLiveCard() {
                     value: r.points * r.multiplier,
                     label: t('colPoints')
                 });
-            }).join('');
+            }).join('')
+            + UI.footer([`${t('ftFpl')} ${UI.when(new Date())}`, gw.inProgress ? t('ftRefresh') : '']);
         if (gw.inProgress) setTimeout(loadLiveCard, 60000);
     } catch (error) {
-        content.innerHTML = `<div class="loading">${t('errorLive')}</div>`;
+        content.innerHTML = `${UI.state('error', t('errorLive'))}`;
         console.error(error);
     }
 }
@@ -378,9 +375,10 @@ async function loadPricesCard() {
             href: `player.html?id=${p.id}`
         });
         content.innerHTML = UI.subtitle(t('pcYourSquad')) + squad.map(row).join('')
-            + UI.subtitle(t('pcRisers')) + risers.map(row).join('');
+            + UI.subtitle(t('pcRisers')) + risers.map(row).join('')
+            + UI.footer([`${t('ftPredictor')} ${UI.when(new Date())}`]);
     } catch (error) {
-        content.innerHTML = `<div class="loading">${t('errorPrices')}</div>`;
+        content.innerHTML = `${UI.state('error', t('errorPrices'))}`;
         console.error(error);
     }
 }

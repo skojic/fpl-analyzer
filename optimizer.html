@@ -32,15 +32,15 @@
             <button class="back-btn" onclick="window.close()" title="Close" aria-label="Close">←</button>
             <h1 data-i18n="cardOptimizer">AI Team & Chips</h1>
             <div class="lang-switcher">
-                <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English">🇬🇧</button>
-                <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski">🇷🇸</button>
+                <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English" aria-label="English">🇬🇧</button>
+                <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski" aria-label="Srpski">🇷🇸</button>
             </div>
             <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">🌙</button>
         </header>
 
         <div class="card">
             <div class="card-content" id="optimizer-content">
-                <div class="loading">Optimizing...</div>
+                <div class="ui-skeleton" aria-busy="true"><span class="sr-only" data-i18n="loadingText">Loading…</span><i></i><i></i><i></i></div>
             </div>
         </div>
     </div>
@@ -71,7 +71,7 @@
 
         async function loadOptimizer() {
             const content = document.getElementById('optimizer-content');
-            content.innerHTML = `<div class="loading">${t('opLoading')}</div>`;
+            content.innerHTML = `${UI.skeleton()}`;
 
             try {
                 const [teamData, allPlayers] = await Promise.all([FPL_API.getTeamComposition(), FPL_API.getAllPlayers()]);
@@ -81,7 +81,7 @@
                     Predictor.getChipCalendar(teamData.picks, allPlayers, bank)
                 ]);
                 if (!report) {
-                    content.innerHTML = `<div class="loading">${t('fxNone')}</div>`;
+                    content.innerHTML = `${UI.state('empty', t('fxNone'))}`;
                     return;
                 }
                 const ownedIds = new Set(teamData.picks.map(p => p.id));
@@ -123,7 +123,7 @@
 
                 content.innerHTML = html;
             } catch (error) {
-                content.innerHTML = `<div class="loading">${t('errorOptimizer')}</div>`;
+                content.innerHTML = `${UI.state('error', t('errorOptimizer'))}`;
                 console.error(error);
             }
         }

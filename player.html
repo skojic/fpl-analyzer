@@ -334,8 +334,8 @@
         <div class="pp-back">
             <button class="back-btn" type="button" onclick="history.length > 1 ? history.back() : UI.go('database.html')">← Back</button>
             <div class="lang-switcher" style="display:inline-flex;">
-                <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English">🇬🇧</button>
-                <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski">🇷🇸</button>
+                <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English" aria-label="English">🇬🇧</button>
+                <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski" aria-label="Srpski">🇷🇸</button>
             </div>
             <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">🌙</button>
         </div>
@@ -397,7 +397,7 @@
         const playerId = parseInt(params.get('id'));
 
         if (!playerId) {
-            root.innerHTML = `<div class="pp-loading">No player ID specified in URL.<br><small>Use <code>player.html?id=123</code></small></div>`;
+            root.innerHTML = UI.state('empty', 'No player ID specified in URL. Use <code>player.html?id=123</code>');
             return;
         }
 
@@ -411,7 +411,7 @@
             ]);
 
             const p = allPlayers.find(x => x.id === playerId);
-            if (!p) { root.innerHTML = `<div class="pp-loading">Player not found.</div>`; return; }
+            if (!p) { root.innerHTML = UI.state('empty', 'Player not found.'); return; }
 
             document.title = `${p.name} – FPL Profile`;
 
@@ -818,7 +818,7 @@
 
         } catch (err) {
             console.error(err);
-            root.innerHTML = `<div class="pp-loading">Failed to load player data.<br><small>${err.message}</small></div>`;
+            root.innerHTML = UI.state('error', `Failed to load player data: ${UI.esc(err.message)}`);
         }
     })();
     </script>

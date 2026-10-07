@@ -61,15 +61,15 @@
             <button class="back-btn" onclick="window.close()" title="Close" aria-label="Close">←</button>
             <h1 data-i18n="cardTransfers">Transfer Suggestions</h1>
             <div class="lang-switcher">
-                <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English">🇬🇧</button>
-                <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski">🇷🇸</button>
+                <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English" aria-label="English">🇬🇧</button>
+                <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski" aria-label="Srpski">🇷🇸</button>
             </div>
             <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">🌙</button>
         </header>
 
         <div class="card">
             <div class="card-content" id="transfers-content">
-                <div class="loading">Analyzing transfers...</div>
+                <div class="ui-skeleton" aria-busy="true"><span class="sr-only" data-i18n="loadingText">Loading…</span><i></i><i></i><i></i></div>
             </div>
         </div>
     </div>
@@ -91,7 +91,7 @@
         async function renderPlan() {
             const el = document.getElementById('plan-section');
             if (!el || !planInputs) return;
-            el.innerHTML = `<div class="loading">${t('loadingTransfers')}</div>`;
+            el.innerHTML = `${UI.skeleton()}`;
             try {
                 const prefs = FPL_API.getPlanPrefs();
                 const plan = await Predictor.planTransfers(planInputs.picks, planInputs.allPlayers, planInputs.bank, prefs);
@@ -106,7 +106,7 @@
                     <div class="plan-steps">`;
                 for (const step of plan.steps) {
                     html += `<div class="plan-step${step.moves.length ? '' : ' roll'}">
-                        <div class="plan-step-gw"><span>GW${step.gw}</span><span>${step.freeTransfers} ${t('planFT')}${step.hit ? ` <span class="plan-hit">−${step.hit}</span>` : ''}</span></div>
+                        <div class="plan-step-gw"><span>GW${step.gw}</span><span>${step.freeTransfers} ${UI.term('ft', t('planFT'))}${step.hit ? ` <span class="plan-hit">${UI.term('hit', `−${step.hit}`)}</span>` : ''}</span></div>
                         ${step.moves.length
                             ? step.moves.map(m => `<div class="plan-move">${m.out.name} → <strong>${m.in.name}</strong> £${safeNumber(m.in.price, 1)}m
                                 <button class="plan-ban" title="${t('planBan')}" onclick="togglePlanPref('banned', ${m.in.id})">⛔</button></div>`).join('')
@@ -132,7 +132,7 @@
                 }
                 el.innerHTML = html;
             } catch (error) {
-                el.innerHTML = `<div class="loading">${t('errorTransfers')}</div>`;
+                el.innerHTML = `${UI.state('error', t('errorTransfers'))}`;
                 console.error(error);
             }
         }
@@ -145,7 +145,7 @@
                 const allPlayers = await FPL_API.getAllPlayers();
                 const bank = teamData.entryHistory ? teamData.entryHistory.bank / 10 : 0;
 
-                content.innerHTML = `<div class="loading">${t('loadingTransfers')}</div>`;
+                content.innerHTML = `${UI.skeleton()}`;
 
                 const plan = await Predictor.getTransferPlan(teamData.picks, allPlayers, bank);
                 planInputs = { picks: teamData.picks, allPlayers, bank };
@@ -368,7 +368,7 @@
                 content.innerHTML = html;
                 renderPlan();
             } catch (error) {
-                content.innerHTML = `<div class="loading">${t('errorTransfers')}</div>`;
+                content.innerHTML = `${UI.state('error', t('errorTransfers'))}`;
                 console.error(error);
             }
         }

@@ -27,15 +27,15 @@
             <button class="back-btn" onclick="window.close()" title="Close" aria-label="Close">←</button>
             <h1 data-i18n="cardLeague">Mini-League</h1>
             <div class="lang-switcher">
-                <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English">🇬🇧</button>
-                <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski">🇷🇸</button>
+                <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English" aria-label="English">🇬🇧</button>
+                <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski" aria-label="Srpski">🇷🇸</button>
             </div>
             <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">🌙</button>
         </header>
 
         <div class="card">
             <div class="card-content" id="league-content">
-                <div class="loading">Loading league...</div>
+                <div class="ui-skeleton" aria-busy="true"><span class="sr-only" data-i18n="loadingText">Loading…</span><i></i><i></i><i></i></div>
             </div>
         </div>
     </div>
@@ -50,7 +50,7 @@
         const swing = x => UI.signed(x);
 
         function playerTable(rows, columns) {
-            const heads = { name: t('colName'), eo: 'EO', yours: t('leagueYours'), owned: t('colOwned'), captaincy: 'C%', xPts: 'xPts', swing: t('leagueSwing') };
+            const heads = { name: t('colName'), eo: UI.term('eo'), yours: UI.term('multiplier', t('leagueYours')), owned: t('colOwned'), captaincy: 'C%', xPts: UI.term('xpts'), swing: UI.term('swing', t('leagueSwing')) };
             const cells = {
                 name: r => `<a href="player.html?id=${r.player.id}">${r.player.name}</a> <span style="opacity:0.6;">${r.player.team}</span>`,
                 eo: r => pct(r.eo),
@@ -67,12 +67,12 @@
 
         async function loadLeague() {
             const content = document.getElementById('league-content');
-            content.innerHTML = `<div class="loading">${t('loadingLeague')}</div>`;
+            content.innerHTML = `${UI.skeleton()}`;
 
             try {
                 const leagues = await League.getMyLeagues();
                 if (!leagues.length) {
-                    content.innerHTML = `<div class="loading">${t('leagueNone')}</div>`;
+                    content.innerHTML = `${UI.state('empty', t('leagueNone'))}`;
                     return;
                 }
                 const param = new URLSearchParams(location.search).get('id');
@@ -111,7 +111,7 @@
 
                 content.innerHTML = html;
             } catch (error) {
-                content.innerHTML = `<div class="loading">${t('errorLeague')}</div>`;
+                content.innerHTML = `${UI.state('error', t('errorLeague'))}`;
                 console.error(error);
             }
         }
