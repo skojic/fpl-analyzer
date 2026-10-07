@@ -42,6 +42,12 @@ Link to the APP: https://fpl-analyzer-eosin.vercel.app/
 - Form trend indicators (Rising, Stable, Falling)
 - Detailed fixture-by-fixture breakdown for top players
 
+### 📋 Suggested Lineup
+- For the next gameweek, from the players you own (including transfers already made for the deadline): best starting XI, captain, vice-captain and bench order, shown on the same pitch as My Team with each player's projected points and next opponent
+- The bench follows FPL's automatic substitutions: backup goalkeeper first, then outfield players by projected points
+- Lists what to change compared with your current lineup (who to start / bench, captain and vice-captain) and the points gained
+- Also available as a **Current / Suggested** switch on the Home My Team card
+
 ### 🔄 Transfer Suggestions
 - Every single transfer is scored by how much it improves your **best XI plus captain** over the next 5 gameweeks, so swapping a bench player only counts if the new player would start
 - Uses your real **selling prices** (half of any price rise), bank, the **3-per-club limit** and transfers already made for the next deadline
@@ -184,6 +190,7 @@ fpl-analyzer/
 ├── theme.js                # Dark/light theme manager (runs before render)
 ├── kits.js                 # Kit colour picker (9 themes, persisted)
 ├── team.html               # Expanded team / pitch view
+├── lineup.html             # Suggested lineup for the next gameweek
 ├── performance.html        # Expanded performance & charts view
 ├── database.html           # Expanded player database view
 ├── prediction.html         # Expanded predictions view

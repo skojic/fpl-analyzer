@@ -938,6 +938,56 @@ const Predictor = {
         return { available, used, deadline: stop, weeks, best };
     },
 
+    // ── Suggested lineup for the next gameweek ───────────────────────────────
+    // From the squad you own (after transfers already made for the deadline): best valid XI, captain
+    // and vice-captain by projected points, and the bench ordered for automatic substitutions:
+    // the backup goalkeeper first, then outfield players by projected points.
+    async suggestLineup(currentTeam, allPlayers, bank) {
+        const ctx = await this.getContext();
+        if (!ctx.horizon.length) return null;
+        const state = await this.getTransferState(currentTeam, allPlayers, bank, ctx);
+        await this.loadRecentHistory(state.squad);
+        const proj = state.squad.map(p => this.projectPlayerSync(p, ctx));
+        const xPts = pr => pr.perGW[0] || 0;
+
+        const lineup = this.bestLineup(proj, 0);
+        const xi = lineup.xi.slice().sort((a, b) => xPts(b) - xPts(a));
+        const [captain, vice] = xi;
+        const inXi = new Set(xi.map(pr => pr.player.id));
+        const benched = proj.filter(pr => !inXi.has(pr.player.id));
+        const bench = [
+            ...benched.filter(pr => pr.player.position === 'GKP'),
+            ...benched.filter(pr => pr.player.position !== 'GKP').sort((a, b) => xPts(b) - xPts(a))
+        ];
+
+        // Your current lineup for comparison: the XI as set for the last deadline (a player bought for
+        // the next deadline takes the sold player's place) with the captain, or the vice if he was sold
+        const currentXi = proj.filter(pr => (pr.player.pickOrder || 99) <= 11);
+        const currentCaptain = proj.find(pr => pr.player.isCaptain) || proj.find(pr => pr.player.isViceCaptain) || null;
+        const currentVice = proj.find(pr => pr.player.isViceCaptain && pr !== currentCaptain) || null;
+        const currentPoints = currentXi.reduce((sum, pr) => sum + xPts(pr), 0)
+            + (currentCaptain && currentXi.includes(currentCaptain) ? xPts(currentCaptain) : 0);
+        const currentIds = new Set(currentXi.map(pr => pr.player.id));
+
+        const shape = pr => ({ ...pr.player, xPts: xPts(pr), isCaptain: pr === captain, isViceCaptain: pr === vice });
+        return {
+            gameweek: ctx.horizon[0].id,
+            xi: xi.map(shape),
+            bench: bench.map(shape),
+            points: lineup.points,
+            currentPoints,
+            gain: lineup.points - currentPoints,
+            changes: {
+                toStart: xi.filter(pr => !currentIds.has(pr.player.id)).map(shape),
+                toBench: currentXi.filter(pr => !inXi.has(pr.player.id)).map(shape),
+                captainFrom: currentCaptain ? shape(currentCaptain) : null,
+                captainTo: captain ? shape(captain) : null,
+                viceFrom: currentVice ? shape(currentVice) : null,
+                viceTo: vice ? shape(vice) : null
+            }
+        };
+    },
+
     // ── Blank and double gameweeks ───────────────────────────────────────────
     // Gameweeks in the context where a team plays twice or not at all, with the squad players affected,
     // and matches postponed without a new date (they usually become doubles later)

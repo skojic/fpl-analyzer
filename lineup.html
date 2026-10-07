@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- PWA / Home screen icon -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <meta name="theme-color" content="#37003c">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="FPL Analyzer">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Suggested Lineup - FPL Analyzer</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="components.css">
+    <script src="theme.js"></script>
+    <script src="lang.js"></script>
+    <script src="ui.js"></script>
+</head>
+<body class="page">
+    <div class="container">
+        <header>
+            <h1 data-i18n="cardLineup">Suggested Lineup</h1>
+            <div class="lang-switcher">
+                <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English" aria-label="English">🇬🇧</button>
+                <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski" aria-label="Srpski">🇷🇸</button>
+            </div>
+            <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">🌙</button>
+        </header>
+
+        <div class="card">
+            <div class="card-content" id="lineup-content">
+                <div class="ui-skeleton" aria-busy="true"><span class="sr-only" data-i18n="loadingText">Loading…</span><i></i><i></i><i></i></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="fpl-api.js"></script>
+    <script src="prediction.js"></script>
+    <script>
+        async function loadLineup() {
+            const content = document.getElementById('lineup-content');
+            try {
+                const [teamData, allPlayers, fixtures, bootstrap] = await Promise.all([
+                    FPL_API.getTeamComposition(), FPL_API.getAllPlayers(), FPL_API.getFixtures(), FPL_API.getBootstrapStatic()
+                ]);
+                const bank = teamData.entryHistory ? teamData.entryHistory.bank / 10 : 0;
+                const s = await Predictor.suggestLineup(teamData.picks, allPlayers, bank);
+                if (!s) {
+                    content.innerHTML = UI.state('empty', t('fxNone'));
+                    return;
+                }
+                const fixtureMap = UI.nextFixtureMap(bootstrap, fixtures);
+                const name = p => `${UI.esc(p.name)} <span class="ui-muted">${safeNumber(p.xPts, 1)}</span>`;
+                const c = s.changes;
+
+                // What to change compared with your current lineup
+                const lines = [];
+                const pairs = Math.max(c.toStart.length, c.toBench.length);
+                for (let i = 0; i < pairs; i++) {
+                    lines.push(UI.row({
+                        title: `${t('luStart')} ${c.toStart[i] ? name(c.toStart[i]) : '–'}`,
+                        meta: c.toBench[i] ? `${t('luBench')} ${name(c.toBench[i])}` : '',
+                        value: c.toStart[i] && c.toBench[i] ? UI.signed(c.toStart[i].xPts - c.toBench[i].xPts) : ''
+                    }));
+                }
+                if (c.captainTo && (!c.captainFrom || c.captainFrom.id !== c.captainTo.id)) {
+                    lines.push(UI.row({ title: `${t('luCaptain')}: ${name(c.captainTo)}`, meta: c.captainFrom ? `${t('luInsteadOf')} ${name(c.captainFrom)}` : '' }));
+                }
+                if (c.viceTo && (!c.viceFrom || c.viceFrom.id !== c.viceTo.id)) {
+                    lines.push(UI.row({ title: `${t('luVice')}: ${name(c.viceTo)}`, meta: c.viceFrom ? `${t('luInsteadOf')} ${name(c.viceFrom)}` : '' }));
+                }
+
+                let html = UI.stats([
+                    [safeNumber(s.points, 1), `${t('luSuggested')} · GW${s.gameweek}`],
+                    [safeNumber(s.currentPoints, 1), t('luCurrent')],
+                    [UI.signed(s.gain), t('luGain')]
+                ]);
+                html += UI.subtitle(t('luChanges'));
+                html += lines.length ? lines.join('') : UI.state('empty', t('luNoChanges'));
+                html += UI.subtitle(`${t('cardLineup')} · GW${s.gameweek}`);
+                html += UI.pitch(s.xi, s.bench, fixtureMap, { label: p => `${safeNumber(p.xPts, 1)} xPts` });
+                html += `<div class="ui-meta">${t('luBenchOrder')}</div>`;
+                html += UI.footer(UI.projectionSources());
+                content.innerHTML = html;
+            } catch (error) {
+                content.innerHTML = UI.state('error', t('errorPredictions'));
+                console.error(error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadLineup);
+    </script>
+
+    <footer class="site-footer" data-i18n-html="footerHtml">
+        Made with <span class="heart">&#x2665;</span> for you by <strong>Srdjan Kojic</strong>
+    </footer>
+</body>
+</html>

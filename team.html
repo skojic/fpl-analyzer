@@ -65,90 +65,17 @@
                 document.getElementById('team-name-header').textContent = managerData.name;
                 document.getElementById('team-subtitle').textContent = `Team ID: ${FPL_API.TEAM_ID}`;
 
-                // Sort by pick order (squad position 1-15)
+                // Pitch: starting XI (squad positions 1-11) and bench in order
                 teamData.picks.sort((a, b) => a.squadPosition - b.squadPosition);
-
-                // Separate starting XI (positions 1-11) and bench (12-15)
-                const startingXI = teamData.picks.filter(p => p.squadPosition <= 11);
-                const bench = teamData.picks.filter(p => p.squadPosition > 11);
-
-                // Field visualization
-                let html = '<div class="football-field">';
-
-                // Group starting XI by player position (GKP/DEF/MID/FWD)
-                const gkp = startingXI.filter(p => p.position === 'GKP');
-                const def = startingXI.filter(p => p.position === 'DEF');
-                const mid = startingXI.filter(p => p.position === 'MID');
-                const fwd = startingXI.filter(p => p.position === 'FWD');
-
-                // Render formation (goalkeeper at top, forwards at bottom)
-                if (gkp.length > 0) {
-                    html += '<div class="field-line">';
-                    gkp.forEach(player => {
-                        html += UI.fieldPlayer(player, _fixtureMap);
-                    });
-                    html += '</div>';
-                }
-
-                if (def.length > 0) {
-                    html += '<div class="field-line">';
-                    def.forEach(player => {
-                        html += UI.fieldPlayer(player, _fixtureMap);
-                    });
-                    html += '</div>';
-                }
-
-                if (mid.length > 0) {
-                    html += '<div class="field-line">';
-                    mid.forEach(player => {
-                        html += UI.fieldPlayer(player, _fixtureMap);
-                    });
-                    html += '</div>';
-                }
-
-                if (fwd.length > 0) {
-                    html += '<div class="field-line">';
-                    fwd.forEach(player => {
-                        html += UI.fieldPlayer(player, _fixtureMap);
-                    });
-                    html += '</div>';
-                }
-
-                if (bench.length > 0) {
-                    html += '<div class="bench-section">';
-                    html += '<div class="bench-title">Substitutes</div>';
-                    html += '<div class="bench-players">';
-                    bench.forEach(player => {
-                        html += `<div class="bench-player">${UI.fieldPlayer(player, _fixtureMap)}</div>`;
-                    });
-                    html += '</div>';
-                    html += '</div>';
-                }
-
-                html += '</div>';
+                let html = UI.pitch(teamData.picks.filter(p => p.squadPosition <= 11), teamData.picks.filter(p => p.squadPosition > 11), _fixtureMap);
 
                 if (teamData.entryHistory) {
-                    html += `
-                        <h3 style="margin-top: 30px; color: var(--primary-color);">Team Statistics</h3>
-                        <div class="stats-grid" style="margin-top: 20px;">
-                            <div class="stat-card">
-                                <div class="stat-card-value">${teamData.entryHistory.points}</div>
-                                <div class="stat-card-label">GW Points</div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-card-value">£${(teamData.entryHistory.bank / 10).toFixed(1)}m</div>
-                                <div class="stat-card-label">Bank</div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-card-value">${(teamData.entryHistory.value / 10).toFixed(1)}m</div>
-                                <div class="stat-card-label">Team Value</div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-card-value">${teamData.entryHistory.event_transfers}</div>
-                                <div class="stat-card-label">Transfers Made</div>
-                            </div>
-                        </div>
-                    `;
+                    html += UI.stats([
+                        [teamData.entryHistory.points, t('gwPoints')],
+                        [`£${safeNumber(teamData.entryHistory.bank / 10, 1)}m`, t('bank')],
+                        [`£${safeNumber(teamData.entryHistory.value / 10, 1)}m`, t('teamValue')],
+                        [teamData.entryHistory.event_transfers, t('transfersGW')]
+                    ]);
                 }
 
                 content.innerHTML = html;

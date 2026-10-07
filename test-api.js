@@ -274,6 +274,23 @@ const tests = [
         if (pr.fixtures.filter(f => f.event === later).length !== 2) throw new Error('double week should have two fixtures');
         return `${home.name}: GW${next.id} blank 0 pts, GW${later} double ${pr.perGW[2].toFixed(1)} pts`;
     }],
+    ['Lineup: suggested XI, captain and bench order are valid', async () => {
+        const team = await FPL_API.getTeamComposition();
+        const players = await FPL_API.getAllPlayers();
+        const s = await Predictor.suggestLineup(team.picks, players, team.entryHistory.bank / 10);
+        if (!s) return 'no next gameweek';
+        const count = pos => s.xi.filter(p => p.position === pos).length;
+        if (s.xi.length !== 11 || s.bench.length !== 4) throw new Error(`${s.xi.length} starters, ${s.bench.length} on the bench`);
+        if (count('GKP') !== 1 || count('DEF') < 3 || count('MID') < 2 || count('FWD') < 1) throw new Error('invalid formation');
+        if (s.bench[0].position !== 'GKP') throw new Error('backup goalkeeper should be first on the bench');
+        const outfield = s.bench.slice(1).map(p => p.xPts);
+        if (outfield.some((x, i) => i > 0 && x > outfield[i - 1] + 1e-9)) throw new Error('bench not ordered by projected points');
+        const captain = s.xi.find(p => p.isCaptain);
+        if (!captain || s.xi.some(p => p.xPts > captain.xPts + 1e-9)) throw new Error('captain is not the highest projection');
+        if (!s.xi.some(p => p.isViceCaptain)) throw new Error('no vice-captain');
+        if (s.gain < -1e-9) throw new Error(`suggestion worse than current lineup (${s.gain})`);
+        return `GW${s.gameweek}: ${s.points.toFixed(1)} xPts (+${s.gain.toFixed(1)}), C ${captain.name}, bench ${s.bench.map(p => p.name).join(', ')}`;
+    }],
     ['Model: return date parsing', async () => {
         const d = Predictor.parseReturnDate('Hamstring injury - Expected back 18 Oct');
         if (!d || d.getUTCDate() !== 18 || d.getUTCMonth() !== 9) throw new Error(`got ${d}`);

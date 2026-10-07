@@ -358,10 +358,10 @@ body:not(.page) .container > header .header-eyebrow { margin-bottom: 4px; }
     body:not(.page) .container > header { padding: 48px 16px 34px; }
     body:not(.page) .container > header h1 { font-size: 1.6em; }
 }
-.stat-card-value .ui-up,
-.stat-card-value .ui-down { display: block; font-size: 0.5em; }
+.ui-rank-move { display: block; font-size: 0.5em; }
 
 /* Stat tiles: rows fill evenly (no orphan tile), readable gains / losses on the purple tiles */
 .stats-grid.ui-stats { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
 .stat-card .ui-up { color: var(--secondary-color); }
 .stat-card .ui-down { color: #ff8fb1; }
+.team-view { justify-content: center; margin-top: 0; }

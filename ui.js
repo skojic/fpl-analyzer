@@ -94,7 +94,7 @@ const UI = {
     rankText(info) {
         if (!info || !info.rank) return '–';
         const move = info.before ? info.before - info.rank : 0;
-        const arrow = move > 0 ? ` <span class="ui-up">▲${move.toLocaleString()}</span>` : move < 0 ? ` <span class="ui-down">▼${(-move).toLocaleString()}</span>` : '';
+        const arrow = move > 0 ? ` <span class="ui-up ui-rank-move">▲${move.toLocaleString()}</span>` : move < 0 ? ` <span class="ui-down ui-rank-move">▼${(-move).toLocaleString()}</span>` : '';
         return `${info.official ? '' : '≈ '}${info.rank.toLocaleString()}${arrow}`;
     },
 
@@ -130,14 +130,29 @@ const UI = {
         return map;
     },
 
+    // A pitch: starting XI in lines (GKP at the top, FWD at the bottom) and the bench in order.
+    // `label(player)` is the text under the name (points by default).
+    pitch(xi, bench, fixtureMap, { label = null } = {}) {
+        const line = pos => {
+            const players = xi.filter(p => p.position === pos);
+            return players.length ? `<div class="field-line">${players.map(p => UI.fieldPlayer(p, fixtureMap, label)).join('')}</div>` : '';
+        };
+        return `<div class="football-field">${['GKP', 'DEF', 'MID', 'FWD'].map(line).join('')}
+            ${bench.length ? `<div class="bench-section"><div class="bench-title">${t('substitutes')}</div><div class="bench-players">
+                ${bench.map(p => `<div class="bench-player">${UI.fieldPlayer(p, fixtureMap, label)}</div>`).join('')}
+            </div></div>` : ''}
+        </div>`;
+    },
+
     // A player on the pitch: kit, name, points, availability flag and next fixture
-    fieldPlayer(player, fixtureMap) {
+    fieldPlayer(player, fixtureMap, label = null) {
         const captainClass = player.isCaptain ? 'captain' : (player.isViceCaptain ? 'vice-captain' : '');
         const avail = FPL_API.getAvailability(player);
         const flagHtml = avail
             ? `<div class="player-flag player-flag-${avail.level}" title="${UI.esc(avail.news)}">${avail.isKey ? t(avail.label) : avail.label}</div>`
             : '';
         const points = player.eventPoints || 0;
+        const labelText = label ? label(player) : `${points} pts`;
         const kitSuffix = player.position === 'GKP' ? '_1' : '';
         const kitImg = player.teamCode
             ? `<img class="player-kit-img" src="https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_${player.teamCode}${kitSuffix}-66.png" alt="" onerror="this.style.display='none'" referrerpolicy="no-referrer">`
@@ -149,12 +164,12 @@ const UI = {
         }).join('');
 
         return `
-            <div class="field-player player-clickable" role="link" tabindex="0" aria-label="${UI.esc(player.name)}, ${points} pts"
+            <div class="field-player player-clickable" role="link" tabindex="0" aria-label="${UI.esc(player.name)}, ${UI.esc(labelText)}"
                  onclick="UI.go('player.html?id=${player.id}')" onkeydown="if(event.key==='Enter')UI.go('player.html?id=${player.id}')" title="View ${player.name} profile">
                 <div class="player-shirt-box${avail ? ` flag-${avail.level}` : ''}">
                     <div class="player-shirt ${captainClass}">${kitImg}</div>
                     <div class="player-name-field">${player.name}</div>
-                    <div class="player-points-field">${points} pts</div>
+                    <div class="player-points-field">${labelText}</div>
                     ${flagHtml}
                 </div>
                 <div class="player-fixtures-row">${fixHtml}</div>
@@ -198,7 +213,7 @@ UI.addIconSprite = function () {
 // ── App navigation: tabs on top (bottom bar on phones), sub-pages as pills, same-tab links ──
 UI.TABS = [
     { key: 'home', icon: 'home', label: 'navHome', pages: [['index.html', 'navHome']] },
-    { key: 'team', icon: 'shirt', label: 'navTeam', pages: [['team.html', 'cardMyTeam'], ['prediction.html', 'cardPrediction']] },
+    { key: 'team', icon: 'shirt', label: 'navTeam', pages: [['team.html', 'cardMyTeam'], ['lineup.html', 'cardLineup'], ['prediction.html', 'cardPrediction']] },
     { key: 'transfers', icon: 'transfers', label: 'navTransfers', pages: [['transfers.html', 'cardTransfers'], ['optimizer.html', 'cardOptimizer']] },
     { key: 'league', icon: 'trophy', label: 'navLeague', pages: [['league.html', 'cardLeague'], ['live.html', 'cardLive'], ['performance.html', 'cardPerformance']] },
     { key: 'players', icon: 'players', label: 'navPlayers', pages: [['database.html', 'cardDatabase'], ['comparison.html', 'cardComparison'], ['prices.html', 'cardPrices'], ['player.html', null]] },
@@ -250,6 +265,7 @@ UI.renderNav = function () {
 UI.GUIDE = [
     ['live', 'cardLive', 'live.html'],
     ['team', 'cardMyTeam', 'team.html'],
+    ['lineup', 'cardLineup', 'lineup.html'],
     ['prediction', 'cardPrediction', 'prediction.html'],
     ['transfers', 'cardTransfers', 'transfers.html'],
     ['optimizer', 'cardOptimizer', 'optimizer.html'],

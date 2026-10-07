@@ -62,70 +62,26 @@ async function loadMyTeam() {
         // Next fixture per team for the pitch
         appData.fixtureMap = UI.nextFixtureMap(bootstrap, fixtures);
 
-        // Sort by position order
+        // Pitch: your current lineup, or the suggested one for the next gameweek
         teamData.picks.sort((a, b) => a.pickOrder - b.pickOrder);
-
-        // Separate starting XI and bench
-        const startingXI = teamData.picks.slice(0, 11);
-        const bench = teamData.picks.slice(11);
-
-        // Field visualization
         const currentGW = teamData.entryHistory ? teamData.entryHistory.event : '–';
-        let html = `<div class="team-gw-banner">${t('gameweek')} ${currentGW}</div>`;
-        html += '<div class="football-field">';
-
-        // Group starting XI by position
-        const gkp = startingXI.filter(p => p.position === 'GKP');
-        const def = startingXI.filter(p => p.position === 'DEF');
-        const mid = startingXI.filter(p => p.position === 'MID');
-        const fwd = startingXI.filter(p => p.position === 'FWD');
-
-        // Render formation (goalkeeper at top, forwards at bottom)
-        if (gkp.length > 0) {
-            html += '<div class="field-line">';
-            gkp.forEach(player => {
-                html += UI.fieldPlayer(player, appData.fixtureMap);
-            });
-            html += '</div>';
+        const view = appData.teamView || 'current';
+        let pitch;
+        let banner = `${t('gameweek')} ${currentGW}`;
+        if (view === 'suggested') {
+            if (appData.allPlayers.length === 0) appData.allPlayers = await FPL_API.getAllPlayers();
+            const s = await Predictor.suggestLineup(teamData.picks, appData.allPlayers, teamData.entryHistory ? teamData.entryHistory.bank / 10 : 0);
+            if (s) {
+                banner = `${t('cardLineup')} · GW${s.gameweek} · ${s.gain > 0.05 ? `${UI.signed(s.gain)} xPts` : t('luSameAsYours')}`;
+                pitch = UI.pitch(s.xi, s.bench, appData.fixtureMap, { label: p => `${safeNumber(p.xPts, 1)} xPts` });
+            }
         }
-
-        if (def.length > 0) {
-            html += '<div class="field-line">';
-            def.forEach(player => {
-                html += UI.fieldPlayer(player, appData.fixtureMap);
-            });
-            html += '</div>';
-        }
-
-        if (mid.length > 0) {
-            html += '<div class="field-line">';
-            mid.forEach(player => {
-                html += UI.fieldPlayer(player, appData.fixtureMap);
-            });
-            html += '</div>';
-        }
-
-        if (fwd.length > 0) {
-            html += '<div class="field-line">';
-            fwd.forEach(player => {
-                html += UI.fieldPlayer(player, appData.fixtureMap);
-            });
-            html += '</div>';
-        }
-
-        // Bench
-        if (bench.length > 0) {
-            html += '<div class="bench-section">';
-            html += `<div class="bench-title">${t('substitutes')}</div>`;
-            html += '<div class="bench-players">';
-            bench.forEach(player => {
-                html += `<div class="bench-player">${UI.fieldPlayer(player, appData.fixtureMap)}</div>`;
-            });
-            html += '</div>';
-            html += '</div>';
-        }
-
-        html += '</div>';
+        if (!pitch) pitch = UI.pitch(teamData.picks.slice(0, 11), teamData.picks.slice(11), appData.fixtureMap);
+        let html = `<div class="ui-chips team-view">
+                <button class="ui-chip${view === 'current' ? ' on' : ''}" type="button" onclick="setTeamView('current')">${t('luViewCurrent')}</button>
+                <button class="ui-chip${view === 'suggested' ? ' on' : ''}" type="button" onclick="setTeamView('suggested')">${t('luViewSuggested')}</button>
+            </div>
+            <div class="team-gw-banner">${banner}</div>` + pitch;
 
         // Team statistics
         if (teamData.entryHistory) {
@@ -151,6 +107,12 @@ async function loadMyTeam() {
 
 
 
+
+// My Team card: switch between the current and the suggested lineup
+function setTeamView(view) {
+    appData.teamView = view;
+    loadMyTeam();
+}
 
 // Blank / double gameweek banner above the cards (hidden when none are coming)
 async function loadGameweekAlert() {
