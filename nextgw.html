@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- PWA / Home screen icon -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <meta name="theme-color" content="#37003c">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="FPL Analyzer">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Next Gameweek - FPL Analyzer</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="components.css">
+    <script src="theme.js"></script>
+    <script src="lang.js"></script>
+    <script src="ui.js"></script>
+    <style>
+        .nx-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-4); }
+        .nx-teams { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: var(--space-2); margin: var(--space-2) 0; font-weight: 800; }
+        .nx-team { display: flex; align-items: center; gap: 6px; }
+        .nx-team.away { justify-content: flex-end; }
+        .nx-team img { width: 24px; height: 24px; }
+        .nx-score { text-align: center; font-size: 1.25em; }
+        .nx-score small { display: block; font-size: 0.6em; font-weight: 600; color: var(--text-muted); }
+        .nx-line { margin: 6px 0; }
+        .nx-yours { margin-top: var(--space-2); }
+    </style>
+</head>
+<body class="page page-wide">
+    <div class="container">
+        <header>
+            <h1 data-i18n="cardNextGW">Next Gameweek</h1>
+            <div class="lang-switcher">
+                <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English" aria-label="English">🇬🇧</button>
+                <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski" aria-label="Srpski">🇷🇸</button>
+            </div>
+            <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">🌙</button>
+        </header>
+
+        <div class="card">
+            <div class="card-content" id="nextgw-content">
+                <div class="ui-skeleton" aria-busy="true"><span class="sr-only" data-i18n="loadingText">Loading…</span><i></i><i></i><i></i></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="fpl-api.js"></script>
+    <script src="prediction.js"></script>
+    <script>
+        const badge = team => `<img src="https://resources.premierleague.com/premierleague/badges/50/t${team.code}.png" alt="" onerror="this.style.display='none'">`;
+
+        function matchCard(m, squad) {
+            const yours = squad.filter(p => p.teamId === m.home.id || p.teamId === m.away.id);
+            const kickoff = new Date(m.kickoff);
+            const locale = window.LANG === 'sr' ? 'sr-Latn' : 'en-GB';
+            const when = kickoff.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' })
+                + ' ' + kickoff.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+            return `<div class="ui-panel">
+                <div class="ui-meta" style="margin:0;">${when}</div>
+                <div class="nx-teams">
+                    <span class="nx-team">${badge(m.home)}${m.home.shortName}</span>
+                    <span class="nx-score">${safeNumber(m.model.goalsHome, 1)} – ${safeNumber(m.model.goalsAway, 1)}<small>${t('nxLikely')} ${m.model.score.join('–')}</small></span>
+                    <span class="nx-team away">${m.away.shortName}${badge(m.away)}</span>
+                </div>
+                <div class="nx-line"><strong>${t('nxModel')}</strong>${UI.outcomeBar(m.model, m.home.shortName, m.away.shortName)}</div>
+                <div class="nx-line"><strong>${t('nxBooks')}</strong>${m.bookmakers
+                    ? UI.outcomeBar(m.bookmakers, m.home.shortName, m.away.shortName) + `<div class="ui-meta" style="margin:2px 0 0;">${t('nxBookCount').replace('{n}', m.bookmakers.count)}</div>`
+                    : `<div class="ui-meta" style="margin:2px 0 0;">${t('nxNoOdds')}</div>`}</div>
+                <div class="ui-meta">${UI.favourite(m)}</div>
+                ${yours.length ? `<div class="nx-yours ui-chips">${yours.map(p => `<a class="ui-chip" href="player.html?id=${p.id}">${UI.esc(p.name)}</a>`).join('')}</div>` : ''}
+            </div>`;
+        }
+
+        async function loadNextGW() {
+            const content = document.getElementById('nextgw-content');
+            try {
+                const [r, team] = await Promise.all([Predictor.getMatchPredictions(), FPL_API.getTeamComposition().catch(() => ({ picks: [] }))]);
+                if (!r || !r.matches.length) {
+                    content.innerHTML = UI.state('empty', t('fxNone'));
+                    return;
+                }
+                content.innerHTML = `<div class="stats-info" style="font-size:0.84em; line-height:1.6; margin-bottom:14px;">${t('nxExplain')}</div>`
+                    + UI.subtitle(`GW${r.gameweek}`)
+                    + `<div class="nx-list">${r.matches.map(m => matchCard(m, team.picks)).join('')}</div>`
+                    + UI.footer(UI.projectionSources());
+            } catch (error) {
+                content.innerHTML = UI.state('error', t('errorFixtures'));
+                console.error(error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadNextGW);
+    </script>
+
+    <footer class="site-footer" data-i18n-html="footerHtml">
+        Made with <span class="heart">&#x2665;</span> for you by <strong>Srdjan Kojic</strong>
+    </footer>
+</body>
+</html>

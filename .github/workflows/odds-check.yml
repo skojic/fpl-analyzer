@@ -1,0 +1,25 @@
+# One-off, manual check: does the free The Odds API plan include anytime-goalscorer odds?
+# Start it from Actions → "Odds markets check" → Run workflow. Costs about 2 credits. Prints no secrets.
+name: Odds markets check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Check goalscorer odds availability
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+        run: node scripts/check-odds-markets.js

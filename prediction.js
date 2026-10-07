@@ -1076,6 +1076,62 @@ const Predictor = {
         };
     },
 
+    // ── Next gameweek matches: the model's view and the bookmakers' ─────────
+    // Win / draw / loss chances and the most likely score for independent Poisson goals
+    outcomeProbabilities(home, away) {
+        const pmf = lambda => {
+            const p = [Math.exp(-lambda)];
+            for (let k = 1; k <= 10; k++) p.push(p[k - 1] * lambda / k);
+            return p;
+        };
+        const ph = pmf(home);
+        const pa = pmf(away);
+        let win = 0, draw = 0, loss = 0, best = { p: -1, score: [0, 0] };
+        for (let i = 0; i <= 10; i++) {
+            for (let j = 0; j <= 10; j++) {
+                const p = ph[i] * pa[j];
+                if (i > j) win += p; else if (i === j) draw += p; else loss += p;
+                if (p > best.p) best = { p, score: [i, j] };
+            }
+        }
+        const total = win + draw + loss;
+        return { home: win / total, draw: draw / total, away: loss / total, score: best.score };
+    },
+
+    // Every match of the next gameweek: the model's expected goals and chances from team strength alone
+    // (no odds, so it is an independent opinion) next to the bookmakers' chances where priced
+    async getMatchPredictions() {
+        const ctx = await this.getContext();
+        if (!ctx.horizon.length) return null;
+        const gameweek = ctx.horizon[0].id;
+        const fixtures = await FPL_API.getFixtures();
+        const modelOnly = this.buildContext(ctx.bootstrap, fixtures, null, 1, {}, {});
+        const team = id => {
+            const t = ctx.bootstrap.teams.find(x => x.id === id);
+            return { id, shortName: t.short_name, name: t.name, code: t.code };
+        };
+        const matches = fixtures
+            .filter(f => f.event === gameweek)
+            .sort((a, b) => new Date(a.kickoff_time) - new Date(b.kickoff_time))
+            .map(f => {
+                const goals = this.fixtureGoals(f.team_h, f.team_a, true, f.id, modelOnly);
+                const odds = (ctx.odds || {})[f.id];
+                return {
+                    id: f.id,
+                    kickoff: f.kickoff_time,
+                    home: team(f.team_h),
+                    away: team(f.team_a),
+                    difficulty: { home: f.team_h_difficulty, away: f.team_a_difficulty },
+                    model: { goalsHome: goals.scored, goalsAway: goals.conceded, ...this.outcomeProbabilities(goals.scored, goals.conceded) },
+                    bookmakers: odds ? {
+                        home: odds.pHome, draw: odds.pDraw, away: odds.pAway,
+                        goalsHome: odds.goalsHome, goalsAway: odds.goalsAway, count: odds.bookmakers
+                    } : null
+                };
+            });
+        return { gameweek, matches, oddsGenerated: this.dataInfo.odds ? this.dataInfo.odds.generated : null };
+    },
+
     // ── Blank and double gameweeks ───────────────────────────────────────────
     // Gameweeks in the context where a team plays twice or not at all, with the squad players affected,
     // and matches postponed without a new date (they usually become doubles later)

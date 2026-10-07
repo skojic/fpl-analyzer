@@ -226,6 +226,20 @@ const TRANSLATIONS = {
         navPlayers:         'Players',
         navFixtures:        'Fixtures',
         navGuide:           'Guide',
+        cardNextGW:         'Next Gameweek',
+        nxModel:            'Model',
+        nxBooks:            'Bookmakers',
+        nxDraw:             'Draw',
+        nxLikely:           'most likely',
+        nxBookCount:        'average of {n} bookmakers, margin removed',
+        nxNoOdds:           'no odds yet for this match',
+        nxFavModel:         'Model favours',
+        nxFavBooks:         'bookmakers favour',
+        nxFavBoth:          'Model and bookmakers both favour',
+        nxExplain:          'For every match of the next gameweek: the <strong>model</strong>\'s expected goals and win / draw / loss chances from team strength alone (this season\'s xG and home advantage, without odds, so it is an independent opinion), and the <strong>bookmakers\'</strong> chances with their margin removed. Player projections in the rest of the app blend both. Your players in each match are listed underneath.',
+        luViewNextGW:       'Next GW',
+        guide_nextgw_what:  'Every match of the next gameweek with the model\'s predicted score and win / draw / loss chances next to the bookmakers\', who is favoured, and your players in each match.',
+        guide_nextgw_how:   'The model uses team strength only (xG for and against this season, home advantage) and a Poisson model for the score. Bookmaker chances are the average of about 20 bookmakers with their margin removed, refreshed daily. Projections elsewhere blend the two.',
         accOddsPending:     'Bookmaker odds are saved before every match from GW6; after two gameweeks the backtest measures how much weight they deserve, and the app uses the measured weights.',
         accOddsResult:      '{what} on {range}: model alone {model}, best with {best} odds weight {mae} (avg. error).',
         accOddsMatch:       'Match odds',
@@ -655,6 +669,20 @@ const TRANSLATIONS = {
         navPlayers:         'Igrači',
         navFixtures:        'Raspored',
         navGuide:           'Vodič',
+        cardNextGW:         'Sledeće Kolo',
+        nxModel:            'Model',
+        nxBooks:            'Kladionice',
+        nxDraw:             'Nerešeno',
+        nxLikely:           'najverovatnije',
+        nxBookCount:        'prosek {n} kladionica, bez marže',
+        nxNoOdds:           'još nema kvota za ovu utakmicu',
+        nxFavModel:         'Model favorizuje',
+        nxFavBooks:         'kladionice favorizuju',
+        nxFavBoth:          'Model i kladionice favorizuju',
+        nxExplain:          'Za svaku utakmicu sledećeg kola: očekivani golovi i šanse za pobedu / nerešeno / poraz po <strong>modelu</strong>, samo iz snage timova (xG ove sezone i prednost domaćeg terena, bez kvota, dakle nezavisno mišljenje), i šanse po <strong>kladionicama</strong> bez njihove marže. Projekcije igrača u ostatku aplikacije kombinuju oba. Tvoji igrači u svakoj utakmici su navedeni ispod.',
+        luViewNextGW:       'Sledeće kolo',
+        guide_nextgw_what:  'Sve utakmice sledećeg kola sa rezultatom i šansama za pobedu / nerešeno / poraz po modelu pored šansi po kladionicama, ko je favorit i tvoji igrači u svakoj utakmici.',
+        guide_nextgw_how:   'Model koristi samo snagu timova (xG za i protiv ove sezone, prednost domaćeg terena) i Poasonov model za rezultat. Šanse kladionica su prosek oko 20 kladionica bez marže, osvežavaju se dnevno. Projekcije na drugim mestima kombinuju oba.',
         accOddsPending:     'Kvote kladionica se čuvaju pre svake utakmice od 6. kola; posle dva kola provera meri koliku težinu zaslužuju, i aplikacija koristi izmerene težine.',
         accOddsResult:      '{what} na {range}: sam model {model}, najbolje sa težinom kvota {best}: {mae} (prosečna greška).',
         accOddsMatch:       'Kvote utakmica',
@@ -902,6 +930,7 @@ function setLang(lang) {
     if (typeof loadOptimizer            === 'function')  loadOptimizer();
     if (typeof loadPrices               === 'function')  loadPrices();
     if (typeof loadLineup               === 'function')  loadLineup();
+    if (typeof loadNextGW               === 'function')  loadNextGW();
     if (typeof loadLive                 === 'function')  loadLive();
 }
 

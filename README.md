@@ -48,6 +48,11 @@ Link to the APP: https://fpl-analyzer-eosin.vercel.app/
 - Lists what to change compared with your current lineup (who to start / bench, captain and vice-captain) and the points gained
 - Also available as a **Current / Suggested** switch on the Home My Team card
 
+### 🆚 Next Gameweek
+- Every match of the next gameweek: the model's expected goals, most likely score and win / draw / loss chances from team strength alone (an independent view, without odds), next to the bookmakers' chances (average of ~20 bookmakers, margin removed)
+- Who is favoured, whether the model and the bookmakers agree, and your players in each match
+- Also a **Next GW** view on the Home My Team card (next to Current / Suggested)
+
 ### 🔄 Transfer Suggestions
 - Every single transfer is scored by how much it improves your **best XI plus captain** over the next 5 gameweeks, so swapping a bench player only counts if the new player would start
 - Uses your real **selling prices** (half of any price rise), bank, the **3-per-club limit** and transfers already made for the next deadline
@@ -191,6 +196,7 @@ fpl-analyzer/
 ├── kits.js                 # Kit colour picker (9 themes, persisted)
 ├── team.html               # Expanded team / pitch view
 ├── lineup.html             # Suggested lineup for the next gameweek
+├── nextgw.html             # Next gameweek matches: model vs bookmakers
 ├── performance.html        # Expanded performance & charts view
 ├── database.html           # Expanded player database view
 ├── prediction.html         # Expanded predictions view
@@ -209,6 +215,7 @@ fpl-analyzer/
 ├── scripts/build-data.js   # Recent form for every player + top-1,000 ownership
 ├── scripts/build-odds.js   # Bookmaker odds → expected goals (The Odds API, free tier)
 ├── scripts/contrast.js     # WCAG contrast check of the theme colours
+├── scripts/check-odds-markets.js  # One-off: are goalscorer odds on our plan? (manual workflow "Odds markets check")
 ├── data/                   # accuracy.json, recent-form.json, ownership.json, odds.json (refreshed daily)
 ├── .github/workflows/data.yml  # Free daily data refresh
 ├── vercel.json             # Vercel project config

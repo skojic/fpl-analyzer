@@ -327,6 +327,23 @@ const tests = [
         if (!withMarket.fromMarket || !between(withMarket.scored, plain.scored, target)) throw new Error('unpriced match not moved towards the market');
         return `fit within ${(worst * 100).toFixed(2)}% on ${Object.keys(odds).length} matches; GW${later.event} home xG ${plain.scored.toFixed(2)} -> ${withMarket.scored.toFixed(2)}`;
     }],
+    ['Matches: next gameweek predictions are consistent', async () => {
+        const r = await Predictor.getMatchPredictions();
+        if (!r) return 'no next gameweek';
+        const fixtures = (await FPL_API.getFixtures()).filter(f => f.event === r.gameweek);
+        if (r.matches.length !== fixtures.length) throw new Error(`${r.matches.length} matches vs ${fixtures.length} fixtures`);
+        for (const m of r.matches) {
+            const sum = m.model.home + m.model.draw + m.model.away;
+            if (Math.abs(sum - 1) > 1e-6) throw new Error(`${m.home.shortName} v ${m.away.shortName}: model chances sum to ${sum}`);
+            if ((m.model.goalsHome > m.model.goalsAway) !== (m.model.home > m.model.away)) throw new Error('favourite does not follow expected goals');
+            if (m.bookmakers && Math.abs(m.bookmakers.home + m.bookmakers.draw + m.bookmakers.away - 1) > 0.01) throw new Error('bookmaker chances do not sum to 1');
+        }
+        // Poisson sanity: equal teams -> equal win chances; a much stronger home side is a clear favourite
+        const even = Predictor.outcomeProbabilities(1.4, 1.4);
+        const strong = Predictor.outcomeProbabilities(2.5, 0.6);
+        if (Math.abs(even.home - even.away) > 1e-9 || strong.home < 0.7) throw new Error('outcome probabilities off');
+        return `GW${r.gameweek}: ${r.matches.length} matches, ${r.matches.filter(m => m.bookmakers).length} with odds`;
+    }],
     ['Model: return date parsing', async () => {
         const d = Predictor.parseReturnDate('Hamstring injury - Expected back 18 Oct');
         if (!d || d.getUTCDate() !== 18 || d.getUTCMonth() !== 9) throw new Error(`got ${d}`);

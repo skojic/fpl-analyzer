@@ -365,3 +365,10 @@ body:not(.page) .container > header .header-eyebrow { margin-bottom: 4px; }
 .stat-card .ui-up { color: var(--secondary-color); }
 .stat-card .ui-down { color: #ff8fb1; }
 .team-view { justify-content: center; margin-top: 0; }
+
+/* ── Win / draw / loss bar ───────────────────────────────────────────────── */
+.ui-outcome { display: flex; height: 22px; border-radius: 6px; overflow: hidden; margin-top: 3px; font-size: var(--fs-xs); font-weight: 800; }
+.ui-outcome span { display: flex; align-items: center; justify-content: center; white-space: nowrap; overflow: hidden; color: #fff; }
+.ui-outcome .home { background: var(--header-bg); }
+.ui-outcome .draw { background: var(--neutral); color: #1a1a2e; }
+.ui-outcome .away { background: #b4005a; }

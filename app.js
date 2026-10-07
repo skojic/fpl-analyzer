@@ -76,10 +76,29 @@ async function loadMyTeam() {
                 pitch = UI.pitch(s.xi, s.bench, appData.fixtureMap, { label: p => `${safeNumber(p.xPts, 1)} xPts` });
             }
         }
+        if (view === 'nextgw') {
+            const r = await Predictor.getMatchPredictions();
+            if (r && r.matches.length) {
+                const pct = x => `${Math.round(x * 100)}%`;
+                const fav = (p, m) => (p.home >= p.away ? `${m.home.shortName} ${pct(p.home)}` : `${m.away.shortName} ${pct(p.away)}`);
+                banner = `${t('cardNextGW')} · GW${r.gameweek}`;
+                pitch = r.matches.map(m => {
+                    const yours = teamData.picks.filter(p => p.teamId === m.home.id || p.teamId === m.away.id);
+                    return UI.row({
+                        title: `${m.home.shortName} v ${m.away.shortName}${yours.length ? ` <span class="ui-muted">★ ${yours.map(p => UI.esc(p.name)).join(', ')}</span>` : ''}`,
+                        meta: `${t('nxModel')} ${fav(m.model, m)}${m.bookmakers ? ` · ${t('nxBooks')} ${fav(m.bookmakers, m)}` : ''}`,
+                        value: `${safeNumber(m.model.goalsHome, 1)}–${safeNumber(m.model.goalsAway, 1)}`,
+                        label: 'xG',
+                        href: 'nextgw.html'
+                    });
+                }).join('');
+            }
+        }
         if (!pitch) pitch = UI.pitch(teamData.picks.slice(0, 11), teamData.picks.slice(11), appData.fixtureMap);
         let html = `<div class="ui-chips team-view">
                 <button class="ui-chip${view === 'current' ? ' on' : ''}" type="button" onclick="setTeamView('current')">${t('luViewCurrent')}</button>
                 <button class="ui-chip${view === 'suggested' ? ' on' : ''}" type="button" onclick="setTeamView('suggested')">${t('luViewSuggested')}</button>
+                <button class="ui-chip${view === 'nextgw' ? ' on' : ''}" type="button" onclick="setTeamView('nextgw')">${t('luViewNextGW')}</button>
             </div>
             <div class="team-gw-banner">${banner}</div>` + pitch;
 

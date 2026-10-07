@@ -111,6 +111,29 @@ const UI = {
             ${link ? `<a href="fixtures.html">${t('cardFixtures')} →</a>` : ''}</div></div>`;
     },
 
+    // Win / draw / loss bar with percentages: p = { home, draw, away }
+    outcomeBar(p, homeName, awayName) {
+        const pct = x => Math.round(x * 100);
+        // Team name only where it fits; narrow segments show just the number, or nothing
+        const label = (name, v) => (v >= 22 && name ? `${name} ${v}%` : v >= 9 ? `${v}%` : '');
+        return `<div class="ui-outcome" role="img" aria-label="${homeName} ${pct(p.home)}%, ${t('nxDraw')} ${pct(p.draw)}%, ${awayName} ${pct(p.away)}%">
+            <span class="home" style="width:${pct(p.home)}%">${label(homeName, pct(p.home))}</span>
+            <span class="draw" style="width:${pct(p.draw)}%">${label('', pct(p.draw))}</span>
+            <span class="away" style="width:${pct(p.away)}%">${label(awayName, pct(p.away))}</span>
+        </div>`;
+    },
+
+    // Who is favoured by the model and by the bookmakers, and whether they agree
+    favourite(m) {
+        const pick = p => (p.home >= p.away && p.home >= p.draw ? m.home.shortName : p.away >= p.draw ? m.away.shortName : t('nxDraw'));
+        const model = pick(m.model);
+        if (!m.bookmakers) return `${t('nxFavModel')}: <strong>${model}</strong>`;
+        const books = pick(m.bookmakers);
+        return model === books
+            ? `${t('nxFavBoth')}: <strong>${model}</strong>`
+            : `${t('nxFavModel')}: <strong>${model}</strong> · ${t('nxFavBooks')}: <strong>${books}</strong>`;
+    },
+
     // Small heading inside a card
     subtitle(text) {
         return `<h4 class="card-subtitle">${text}</h4>`;
@@ -213,7 +236,7 @@ UI.addIconSprite = function () {
 // ── App navigation: tabs on top (bottom bar on phones), sub-pages as pills, same-tab links ──
 UI.TABS = [
     { key: 'home', icon: 'home', label: 'navHome', pages: [['index.html', 'navHome']] },
-    { key: 'team', icon: 'shirt', label: 'navTeam', pages: [['team.html', 'cardMyTeam'], ['lineup.html', 'cardLineup'], ['prediction.html', 'cardPrediction']] },
+    { key: 'team', icon: 'shirt', label: 'navTeam', pages: [['team.html', 'cardMyTeam'], ['lineup.html', 'cardLineup'], ['nextgw.html', 'cardNextGW'], ['prediction.html', 'cardPrediction']] },
     { key: 'transfers', icon: 'transfers', label: 'navTransfers', pages: [['transfers.html', 'cardTransfers'], ['optimizer.html', 'cardOptimizer']] },
     { key: 'league', icon: 'trophy', label: 'navLeague', pages: [['league.html', 'cardLeague'], ['live.html', 'cardLive'], ['performance.html', 'cardPerformance']] },
     { key: 'players', icon: 'players', label: 'navPlayers', pages: [['database.html', 'cardDatabase'], ['comparison.html', 'cardComparison'], ['prices.html', 'cardPrices'], ['player.html', null]] },
@@ -266,6 +289,7 @@ UI.GUIDE = [
     ['live', 'cardLive', 'live.html'],
     ['team', 'cardMyTeam', 'team.html'],
     ['lineup', 'cardLineup', 'lineup.html'],
+    ['nextgw', 'cardNextGW', 'nextgw.html'],
     ['prediction', 'cardPrediction', 'prediction.html'],
     ['transfers', 'cardTransfers', 'transfers.html'],
     ['optimizer', 'cardOptimizer', 'optimizer.html'],
