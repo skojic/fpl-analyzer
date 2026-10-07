@@ -13,27 +13,12 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Points Prediction - FPL Analyzer</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="components.css">
     <script src="theme.js"></script>
     <script src="lang.js"></script>
-    <style>
-        .container {
-            max-width: 1000px;
-        }
-        .card {
-            margin: 20px auto;
-            background: rgba(255, 255, 255, 0.98) !important;
-            border: 2px solid rgba(66, 181, 88, 0.3);
-        }
-        .card-content {
-            max-height: none;
-        }
-        /* Plain table: the global table styles are built for the wide, sticky player database */
-        .acc-table { width: auto; min-width: 0; border-collapse: collapse; margin: 10px 0; }
-        .acc-table th, .acc-table td { position: static; box-shadow: none; cursor: default; padding: 4px 14px 4px 0; background: transparent; color: inherit; font-size: 1em; border: none; text-align: left; }
-        .acc-table .num { text-align: right; }
-    </style>
+    <script src="ui.js"></script>
 </head>
-<body>
+<body class="page">
     <div class="container">
         <header>
             <button class="back-btn" onclick="window.close()" title="Close" aria-label="Close">←</button>
@@ -55,14 +40,6 @@
     <script src="fpl-api.js"></script>
     <script src="prediction.js"></script>
     <script>
-        // Helper function to safely format numbers and avoid NaN
-        function safeNumber(value, decimals = 0, defaultValue = 0) {
-            const num = parseFloat(value);
-            if (isNaN(num) || num === null || num === undefined) {
-                return decimals > 0 ? defaultValue.toFixed(decimals) : defaultValue;
-            }
-            return decimals > 0 ? num.toFixed(decimals) : Math.round(num);
-        }
 
         // Backtest results published by scripts/backtest.js (refreshed by the daily data job)
         async function accuracyHtml() {
@@ -77,7 +54,7 @@
                 return `<h3 style="margin-top: 30px; color: var(--primary-color);">${t('accTitle')}</h3>
                     <div class="stats-info" style="font-size:0.84em; line-height:1.6;">
                         ${t('accExplain').replace('{range}', `GW${first}–${last}`).replace('{n}', o.model.n)}
-                        <table class="acc-table">
+                        <table class="data-table auto">
                             <tr><th></th><th class="num">${t('accMae')}</th><th class="num">${t('accCorr')}</th></tr>
                             ${row(t('accModel'), o.model)}${row(t('accPPG'), o.baselinePPG)}${row(t('accForm'), o.baselineForm)}
                         </table>

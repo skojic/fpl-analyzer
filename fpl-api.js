@@ -79,10 +79,6 @@ const FPL_API = {
         throw lastError;
     },
 
-    // Team, manager and league names are free text set by FPL users: escape before putting them in HTML
-    escapeHtml(text) {
-        return String(text ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-    },
 
     // Transfer planner preferences (locked / banned player ids), saved per team in the browser
     getPlanPrefs() {

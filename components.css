@@ -1,0 +1,77 @@
+/* Shared components for every page. Built on the tokens in styles.css (:root and [data-theme="dark"]),
+   so they work in light and dark mode without page-specific overrides. */
+
+/* ── Full pages (body.page): one centred card ─────────────────────────────── */
+.page .container { max-width: 1000px; }
+.page.page-wide .container { max-width: 1200px; }
+.page.page-full .container { max-width: 100%; padding: 10px; }
+.page .card {
+    margin: 20px auto;
+    background: var(--card-bg);
+    border: 2px solid rgba(66, 181, 88, 0.3);
+}
+[data-theme="dark"] .page .card { border-color: var(--card-border); }
+.page .card-content { max-height: none; }
+
+/* ── Text helpers ─────────────────────────────────────────────────────────── */
+.ui-meta { font-size: var(--fs-sm); color: var(--text-muted); margin: var(--space-1) 0 var(--space-3); }
+.ui-up { color: var(--positive); font-weight: 800; }
+.ui-down { color: var(--negative); font-weight: 800; }
+.ui-muted { opacity: 0.6; font-weight: 400; }
+
+/* ── Layout ───────────────────────────────────────────────────────────────── */
+.ui-grid-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+@media (max-width: 768px) { .ui-grid-2 { grid-template-columns: 1fr; } }
+
+/* ── Data table: plain, compact, for lists and rankings ──────────────────── */
+.data-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); margin: var(--space-2) 0 var(--space-5); }
+.data-table th,
+.data-table td { padding: 6px 8px; text-align: right; white-space: nowrap; }
+.data-table th { background: var(--header-bg); color: #fff; font-weight: 700; }
+.data-table td { border-bottom: 1px solid var(--divider); color: var(--text-color); }
+.data-table th:first-child,
+.data-table td:first-child,
+.data-table .left { text-align: left; }
+.data-table td:first-child { font-weight: 600; }
+.data-table .num { text-align: right; }
+.data-table.wrap td { white-space: normal; }
+.data-table.auto { width: auto; }
+.data-table.auto th,
+.data-table.auto td { background: transparent; color: inherit; border: none; padding: 4px 14px 4px 0; }
+.data-table tr.me td { background: var(--highlight); font-weight: 700; }
+.data-table tr.dim td { opacity: 0.55; }
+.data-table a { color: inherit; }
+
+/* ── Pills, chips and badges ──────────────────────────────────────────────── */
+.ui-pill {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: var(--fs-sm);
+    font-weight: 700;
+    background: var(--secondary-color);
+    color: var(--on-accent);
+}
+.ui-pill.off { background: var(--divider); color: var(--text-muted); text-decoration: line-through; }
+.ui-best { background: var(--highlight); font-weight: 800; border-radius: 4px; padding: 0 3px; }
+
+.ui-chip {
+    border: 1px solid var(--border-strong);
+    background: transparent;
+    color: inherit;
+    border-radius: 14px;
+    padding: 3px 10px;
+    font-size: var(--fs-sm);
+    cursor: pointer;
+}
+.ui-chip.on { background: var(--header-bg); color: #fff; border-color: var(--header-bg); }
+.ui-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 12px; }
+
+/* ── Progress bar from -100% to +100% (price changes) ─────────────────────── */
+.ui-progress { display: inline-block; width: 60px; height: 8px; border-radius: 4px; background: var(--divider); vertical-align: middle; margin-right: 6px; position: relative; overflow: hidden; }
+.ui-progress span { position: absolute; top: 0; bottom: 0; }
+.ui-progress .up { left: 50%; background: var(--positive); }
+.ui-progress .down { right: 50%; background: var(--negative); }
+
+/* ── Bordered panel (squads, plan steps) ─────────────────────────────────── */
+.ui-panel { border: 1.5px solid var(--border-strong); border-radius: var(--radius); padding: var(--space-3); font-size: var(--fs-sm); }

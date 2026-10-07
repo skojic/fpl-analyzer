@@ -13,49 +13,20 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>AI Team & Chips - FPL Analyzer</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="components.css">
     <script src="theme.js"></script>
     <script src="lang.js"></script>
+    <script src="ui.js"></script>
     <style>
-        .container {
-            max-width: 1000px;
-        }
-        .card {
-            margin: 20px auto;
-            background: rgba(255, 255, 255, 0.98) !important;
-            border: 2px solid rgba(66, 181, 88, 0.3);
-        }
-        [data-theme="dark"] .card {
-            background: var(--bg-surface, #1a1030) !important;
-            border-color: var(--card-border, rgba(255,255,255,0.1));
-        }
-        .card-content {
-            max-height: none;
-        }
         .op-rating { display: flex; align-items: center; gap: 18px; margin-bottom: 14px; }
         .op-score { font-size: 3em; font-weight: 900; color: var(--primary-color); line-height: 1; }
         [data-theme="dark"] .op-score { color: var(--secondary-color); }
-        .op-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-        @media (max-width: 768px) { .op-grid { grid-template-columns: 1fr; } }
-        .op-squad { border: 1.5px solid rgba(55,0,60,0.15); border-radius: 12px; padding: 12px; font-size: 0.85em; }
-        [data-theme="dark"] .op-squad { border-color: rgba(255,255,255,0.12); }
         .op-pos { font-weight: 800; margin: 8px 0 4px; color: var(--primary-color); }
         [data-theme="dark"] .op-pos { color: var(--secondary-color); }
         .op-player { display: flex; justify-content: space-between; padding: 2px 0; }
-        .op-new { color: #16a34a; font-weight: 800; }
-        .op-meta { font-size: 0.85em; color: var(--text-muted, #666); margin: 6px 0; }
-        /* Plain table: the global table styles are built for the wide, sticky player database */
-        .op-table { width: 100%; min-width: 0; border-collapse: collapse; font-size: 0.85em; margin: 10px 0 18px; }
-        .op-table th, .op-table td { position: static; white-space: nowrap; box-shadow: none; cursor: default; font-size: 1em; text-align: right; padding: 6px 8px; }
-        .op-table th:first-child, .op-table td:first-child { text-align: left; }
-        .op-table td:first-child { background: transparent; color: inherit; }
-        .op-table th { background: var(--primary-color); color: #fff; }
-        .op-table td { border-bottom: 1px solid rgba(0,0,0,0.08); }
-        .op-best { background: rgba(0,255,135,0.25); font-weight: 800; border-radius: 4px; }
-        .op-chip { display: inline-block; padding: 2px 10px; border-radius: 12px; margin-right: 6px; font-weight: 700; font-size: 0.85em; background: var(--secondary-color); color: #37003c; }
-        .op-chip.used { background: rgba(0,0,0,0.12); color: var(--text-muted, #666); text-decoration: line-through; }
     </style>
 </head>
-<body>
+<body class="page">
     <div class="container">
         <header>
             <button class="back-btn" onclick="window.close()" title="Close" aria-label="Close">←</button>
@@ -77,30 +48,23 @@
     <script src="fpl-api.js"></script>
     <script src="prediction.js"></script>
     <script>
-        function safeNumber(value, decimals = 0, defaultValue = 0) {
-            const num = parseFloat(value);
-            if (isNaN(num)) {
-                return decimals > 0 ? defaultValue.toFixed(decimals) : defaultValue;
-            }
-            return decimals > 0 ? num.toFixed(decimals) : Math.round(num);
-        }
 
         const CHIP_NAMES = () => ({ wildcard: t('chipWildcard'), freehit: t('chipFreeHit'), bboost: t('chipBenchBoost'), '3xc': t('chipTripleCaptain') });
 
         // A squad by position; players you don't own yet are marked as new
         function squadHtml(title, result, gwsLabel, ownedIds) {
-            let html = `<div class="op-squad"><h3 style="margin:0;">${title}</h3>
-                <div class="op-meta">£${safeNumber(result.cost, 1)}m · ${safeNumber(result.value, 1)} ${t('opPts')} ${gwsLabel} · <strong class="op-new">+${safeNumber(result.gain, 1)}</strong> ${t('opVsYours')} · ${result.incoming.length} ${t('opChanges')}</div>`;
+            let html = `<div class="ui-panel"><h3 style="margin:0;">${title}</h3>
+                <div class="ui-meta">£${safeNumber(result.cost, 1)}m · ${safeNumber(result.value, 1)} ${t('opPts')} ${gwsLabel} · <strong class="ui-up">+${safeNumber(result.gain, 1)}</strong> ${t('opVsYours')} · ${result.incoming.length} ${t('opChanges')}</div>`;
             for (const pos of ['GKP', 'DEF', 'MID', 'FWD']) {
                 html += `<div class="op-pos">${pos}</div>`;
                 for (const pr of result.squad.filter(x => x.player.position === pos).sort((a, b) => b.total - a.total)) {
                     const isNew = !ownedIds.has(pr.player.id);
-                    html += `<div class="op-player"><span class="${isNew ? 'op-new' : ''}">${isNew ? '+ ' : ''}${pr.player.name} <span style="opacity:0.6;">${pr.player.team}</span></span>
+                    html += `<div class="op-player"><span class="${isNew ? 'ui-up' : ''}">${isNew ? '+ ' : ''}${pr.player.name} <span style="opacity:0.6;">${pr.player.team}</span></span>
                         <span>£${safeNumber(pr.player.price, 1)}m · ${safeNumber(result.single ? pr.perGW[0] : pr.total, 1)}</span></div>`;
                 }
             }
             if (result.outgoing.length) {
-                html += `<div class="op-meta" style="margin-top:10px;">${t('opOut')}: ${result.outgoing.map(p => p.name).join(', ')}</div>`;
+                html += `<div class="ui-meta" style="margin-top:10px;">${t('opOut')}: ${result.outgoing.map(p => p.name).join(', ')}</div>`;
             }
             return html + `</div>`;
         }
@@ -126,10 +90,10 @@
                 let html = `<div class="op-rating">
                         <div class="op-score">${report.rating}<span style="font-size:0.4em;">/100</span></div>
                         <div><h3 style="margin:0;">${t('opRating')}</h3>
-                        <div class="op-meta">${t('opRatingExplain').replace('{range}', range).replace('{budget}', safeNumber(report.budget, 1))}</div></div>
+                        <div class="ui-meta">${t('opRatingExplain').replace('{range}', range).replace('{budget}', safeNumber(report.budget, 1))}</div></div>
                     </div>`;
 
-                html += `<div class="op-grid">
+                html += `<div class="ui-grid-2">
                     ${report.wildcard ? squadHtml(`${t('chipWildcard')} · ${range}`, report.wildcard, range, ownedIds) : ''}
                     ${report.freeHit ? squadHtml(`${t('chipFreeHit')} · GW${report.freeHit.gameweek}`, { ...report.freeHit, single: true }, `GW${report.freeHit.gameweek}`, ownedIds) : ''}
                 </div>`;
@@ -138,14 +102,14 @@
                     const names = CHIP_NAMES();
                     html += `<h3 style="margin-top:28px;">${t('opCalendar')} · GW${calendar.weeks[0].gameweek}–${calendar.deadline}</h3>
                         <div style="margin:6px 0;">${['wildcard', 'freehit', 'bboost', '3xc'].map(c =>
-                            `<span class="op-chip${calendar.available.includes(c) ? '' : ' used'}">${names[c]}</span>`).join('')}</div>
+                            `<span class="ui-pill${calendar.available.includes(c) ? '' : ' off'}" style="margin-right:6px;">${names[c]}</span>`).join('')}</div>
                         <div class="stats-info" style="font-size:0.84em; line-height:1.6;">${t('opCalendarExplain').replace('{deadline}', calendar.deadline)}</div>`;
 
                     const anySpecial = calendar.weeks.some(w => w.doubleTeams || w.blankTeams);
-                    if (!anySpecial) html += `<div class="op-meta">${t('opNoSpecial')}</div>`;
+                    if (!anySpecial) html += `<div class="ui-meta">${t('opNoSpecial')}</div>`;
 
-                    const cell = (w, chip, text) => `<td><span class="${calendar.best[chip] === w.gameweek ? 'op-best' : ''}">${text}</span></td>`;
-                    html += `<table class="op-table"><tr><th>GW</th><th>${t('opXI')}</th><th>${names.bboost}</th><th>${names['3xc']}</th><th>${names.freehit}</th><th>${t('opDoubles')}</th><th>${t('opBlanks')}</th></tr>`;
+                    const cell = (w, chip, text) => `<td><span class="${calendar.best[chip] === w.gameweek ? 'ui-best' : ''}">${text}</span></td>`;
+                    html += `<table class="data-table"><tr><th>GW</th><th>${t('opXI')}</th><th>${names.bboost}</th><th>${names['3xc']}</th><th>${names.freehit}</th><th>${t('opDoubles')}</th><th>${t('opBlanks')}</th></tr>`;
                     for (const w of calendar.weeks) {
                         html += `<tr><td>GW${w.gameweek}</td><td>${safeNumber(w.xiPoints, 1)}</td>
                             ${calendar.available.includes('bboost') ? cell(w, 'bboost', `+${safeNumber(w.bboost, 1)}`) : '<td>–</td>'}

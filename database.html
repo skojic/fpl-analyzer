@@ -13,22 +13,12 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Player Database - FPL Analyzer</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="components.css">
     <script src="theme.js"></script>
     <script src="lang.js"></script>
+    <script src="ui.js"></script>
     <style>
-        .container {
-            max-width: 100%;
-            padding: 10px;
-        }
-        .card {
-            margin: 20px auto;
-            background: rgba(255, 255, 255, 0.98) !important;
-            border: 2px solid rgba(66, 181, 88, 0.3);
-        }
-        .card-content {
-            max-height: none;
-            padding: 15px;
-        }
+        .card-content { padding: 15px; }
         table {
             font-size: 0.85em;
         }
@@ -53,7 +43,7 @@
         [data-theme="dark"] .legend-blue   { background: rgba(59,130,246,0.22); color: #93c5fd; }
     </style>
 </head>
-<body>
+<body class="page page-full">
     <div class="container">
         <header>
             <button class="back-btn" onclick="window.close()" title="Close" aria-label="Close">←</button>
@@ -159,13 +149,6 @@
         let sortDirection = 'desc';
 
         // Helper function to safely format numbers
-        function safeNumber(value, decimals = 0, defaultValue = 0) {
-            const num = parseFloat(value);
-            if (isNaN(num) || num === null || num === undefined) {
-                return decimals > 0 ? defaultValue.toFixed(decimals) : defaultValue;
-            }
-            return decimals > 0 ? num.toFixed(decimals) : Math.round(num);
-        }
 
         // Display top performers in headline
         function displayTopPerformers(players) {

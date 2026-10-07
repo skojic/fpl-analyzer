@@ -8,14 +8,6 @@ let appData = {
     sortDirection: 'desc'
 };
 
-// Helper function to safely format numbers and avoid NaN
-function safeNumber(value, decimals = 0, defaultValue = 0) {
-    const num = parseFloat(value);
-    if (isNaN(num) || num === null || num === undefined) {
-        return decimals > 0 ? defaultValue.toFixed(decimals) : defaultValue;
-    }
-    return decimals > 0 ? num.toFixed(decimals) : Math.round(num);
-}
 
 // Initialize the application
 async function initializeApp() {
@@ -71,18 +63,8 @@ async function loadMyTeam() {
         ]);
         appData.myTeam = teamData.picks;
 
-        // Build fixture map: teamId → next 1 upcoming fixture
-        appData.fixtureMap = {};
-        bootstrap.teams.forEach(team => {
-            const upcoming = FPL_API.getUpcomingFixtures(team.id, fixtures, 1);
-            appData.fixtureMap[team.id] = upcoming.map(f => {
-                const isHome = f.team_h === team.id;
-                const oppId  = isHome ? f.team_a : f.team_h;
-                const diff   = isHome ? f.team_h_difficulty : f.team_a_difficulty;
-                const opp    = bootstrap.teams.find(team => team.id === oppId);
-                return { opp: opp ? opp.short_name : '?', oppCode: opp ? opp.code : null, isHome, diff };
-            });
-        });
+        // Next fixture per team for the pitch
+        appData.fixtureMap = UI.nextFixtureMap(bootstrap, fixtures);
 
         // Sort by position order
         teamData.picks.sort((a, b) => a.pickOrder - b.pickOrder);
@@ -106,7 +88,7 @@ async function loadMyTeam() {
         if (gkp.length > 0) {
             html += '<div class="field-line">';
             gkp.forEach(player => {
-                html += renderFieldPlayer(player);
+                html += UI.fieldPlayer(player, appData.fixtureMap);
             });
             html += '</div>';
         }
@@ -114,7 +96,7 @@ async function loadMyTeam() {
         if (def.length > 0) {
             html += '<div class="field-line">';
             def.forEach(player => {
-                html += renderFieldPlayer(player);
+                html += UI.fieldPlayer(player, appData.fixtureMap);
             });
             html += '</div>';
         }
@@ -122,7 +104,7 @@ async function loadMyTeam() {
         if (mid.length > 0) {
             html += '<div class="field-line">';
             mid.forEach(player => {
-                html += renderFieldPlayer(player);
+                html += UI.fieldPlayer(player, appData.fixtureMap);
             });
             html += '</div>';
         }
@@ -130,7 +112,7 @@ async function loadMyTeam() {
         if (fwd.length > 0) {
             html += '<div class="field-line">';
             fwd.forEach(player => {
-                html += renderFieldPlayer(player);
+                html += UI.fieldPlayer(player, appData.fixtureMap);
             });
             html += '</div>';
         }
@@ -141,7 +123,7 @@ async function loadMyTeam() {
             html += `<div class="bench-title">${t('substitutes')}</div>`;
             html += '<div class="bench-players">';
             bench.forEach(player => {
-                html += `<div class="bench-player">${renderFieldPlayer(player)}</div>`;
+                html += `<div class="bench-player">${UI.fieldPlayer(player, appData.fixtureMap)}</div>`;
             });
             html += '</div>';
             html += '</div>';
@@ -176,81 +158,8 @@ async function loadMyTeam() {
     }
 }
 
-// Helper function to render a player on the field
-function renderFieldPlayer(player) {
-    const captainClass = player.isCaptain ? 'captain' : (player.isViceCaptain ? 'vice-captain' : '');
-    const avail = FPL_API.getAvailability(player);
-    const flagHtml = avail
-        ? `<div class="player-flag player-flag-${avail.level}" title="${(avail.news || '').replace(/"/g, '&quot;')}">${avail.isKey ? t(avail.label) : avail.label}</div>`
-        : '';
-    const points = player.eventPoints || 0;
-    const isGK = player.position === 'GKP';
-    const kitSuffix = isGK ? '_1' : '';
-    const kitUrl = player.teamCode
-        ? `https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_${player.teamCode}${kitSuffix}-66.png`
-        : '';
-    const kitImg = kitUrl
-        ? `<img class="player-kit-img" src="${kitUrl}" onerror="this.style.display='none'" referrerpolicy="no-referrer">`
-        : '';
 
-    const fixList = (appData.fixtureMap && appData.fixtureMap[player.teamId]) || [];
-    const fixHtml = fixList.map(f => {
-        const haClass = f.isHome ? 'fp-ha-home' : 'fp-ha-away';
-        const badgeUrl = f.oppCode ? `https://resources.premierleague.com/premierleague/badges/50/t${f.oppCode}.png` : '';
-        const badgeImg = badgeUrl ? `<img class="fp-badge" src="${badgeUrl}" onerror="this.style.display='none'">` : '';
-        return `<span class="fp-fix fp-fdr-${f.diff} ${haClass}" title="${f.isHome ? 'Home' : 'Away'} vs ${f.opp}">${badgeImg}<span class="fp-opp">${f.opp}</span><span class="fp-ha">${f.isHome ? 'H' : 'A'}</span></span>`;
-    }).join('');
 
-    return `
-        <div class="field-player player-clickable" onclick="window.open('player.html?id=${player.id}','_blank')" title="View ${player.name} profile">
-            <div class="player-shirt-box${avail ? ` flag-${avail.level}` : ''}">
-                <div class="player-shirt ${captainClass}">${kitImg}</div>
-                <div class="player-name-field">${player.name}</div>
-                <div class="player-points-field">${points} pts</div>
-                ${flagHtml}
-            </div>
-            <div class="player-fixtures-row">${fixHtml}</div>
-        </div>
-    `;
-}
-
-// Get jersey number for player
-function getJerseyNumber(player) {
-    const positionNumbers = {
-        'GKP': 1,
-        'DEF': 2,
-        'MID': 6,
-        'FWD': 9
-    };
-
-    // Start with base number for position
-    let number = positionNumbers[player.position] || 1;
-
-    // Add variation based on pick order to make unique-ish
-    if (player.pickOrder) {
-        const offset = (player.pickOrder - 1) % 11;
-        number = number + offset;
-        if (number > 11) number = number - 11;
-    }
-
-    return number;
-}
-
-// Get player initials from name
-function getPlayerInitials(name) {
-    if (!name) return '??';
-
-    const parts = name.split(' ');
-    if (parts.length === 1) {
-        return name.substring(0, 2).toUpperCase();
-    }
-
-    // Take first letter of first name and first letter of last name
-    const firstInitial = parts[0].charAt(0);
-    const lastInitial = parts[parts.length - 1].charAt(0);
-
-    return `${firstInitial}${lastInitial}`.toUpperCase();
-}
 
 // Load Performance Card
 async function loadPerformance() {
@@ -666,7 +575,7 @@ async function loadTransferSuggestions() {
         // Multi-week plan in one line: GW6 A → B · GW7 roll · ...
         if (weekPlan.steps.length) {
             const steps = weekPlan.steps.map(st => `<strong>GW${st.gw}</strong> ${st.moves.length
-                ? st.moves.map(m => `${m.out.name} → ${m.in.name}`).join(', ') + (st.hit ? ` <span style="color:#e0004d;">−${st.hit}</span>` : '')
+                ? st.moves.map(m => `${m.out.name} → ${m.in.name}`).join(', ') + (st.hit ? ` <span style="color:var(--negative);">−${st.hit}</span>` : '')
                 : t('planRoll')}`).join(' · ');
             html = `<div style="font-size:0.75em; padding:6px 8px; margin-bottom:8px; border-radius:8px; background:rgba(0,255,135,0.12); line-height:1.5;">
                 <strong>${t('planNext')} (+${safeNumber(weekPlan.gain, 1)} pts ${t('planVsRoll')}):</strong> ${steps}
@@ -693,13 +602,13 @@ async function loadTransferSuggestions() {
                     </div>
                     <div style="padding:4px 8px; display:flex; align-items:center; gap:6px; font-size:0.78em;">
                         <div style="flex:1; min-width:0;">
-                            <span style="font-weight:700; color:#dc2626; font-size:0.72em; text-transform:uppercase; margin-right:3px;">${t('transferOut')}</span>
+                            <span style="font-weight:700; color:var(--negative); font-size:0.72em; text-transform:uppercase; margin-right:3px;">${t('transferOut')}</span>
                             <span style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:inline-block; max-width:80px; vertical-align:bottom;">${tr.out.name}</span>
                             <div style="color:var(--text-muted); font-size:0.8em;">${t('sellPrice')} £${safeNumber(tr.out.sellingPrice,1)}m · ${outSub}</div>
                         </div>
                         <div style="color:var(--text-muted); flex-shrink:0; font-size:1.1em;">→</div>
                         <div style="flex:1; min-width:0;">
-                            <span style="font-weight:700; color:#16a34a; font-size:0.72em; text-transform:uppercase; margin-right:3px;">${t('transferIn')}</span>
+                            <span style="font-weight:700; color:var(--positive); font-size:0.72em; text-transform:uppercase; margin-right:3px;">${t('transferIn')}</span>
                             <span style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:inline-block; max-width:80px; vertical-align:bottom;">${tr.in.name}</span>
                             <div style="color:var(--text-muted); font-size:0.8em;">£${safeNumber(tr.in.price,1)}m · ${inSub}</div>
                         </div>
@@ -726,7 +635,7 @@ async function loadLeagueCard() {
             return;
         }
         const a = await League.analyze(leagues[0].id);
-        const esc = text => FPL_API.escapeHtml(text);
+        const esc = UI.esc;
         const leader = a.standings[0];
         const gap = a.me && leader && leader.entry !== a.me.entry ? a.me.total - leader.total : null;
         const row = r => `
@@ -737,7 +646,7 @@ async function loadLeagueCard() {
                 </div>
                 <div class="player-stats">
                     <div class="stat">
-                        <div class="stat-value" style="color:${r.exposure < 0 ? '#e0004d' : '#16a34a'};">${r.exposure > 0 ? '+' : ''}${safeNumber(r.exposure, 1)}</div>
+                        <div class="stat-value" style="color:${r.exposure < 0 ? 'var(--negative)' : 'var(--positive)'};">${r.exposure > 0 ? '+' : ''}${safeNumber(r.exposure, 1)}</div>
                         <div class="stat-label">${t('leagueSwing')}</div>
                     </div>
                 </div>
@@ -862,7 +771,7 @@ async function loadLiveCard() {
                 </div>
                 <div class="stat-card">
                     <div class="stat-card-value">${me ? `${me.liveRank} / ${table.length}` : '–'}</div>
-                    <div class="stat-card-label">${leagues.length ? FPL_API.escapeHtml(leagues[0].name) : t('leagueRank')}</div>
+                    <div class="stat-card-label">${leagues.length ? UI.esc(leagues[0].name) : t('leagueRank')}</div>
                 </div>
             </div>`;
         if (gw.inProgress) setTimeout(loadLiveCard, 60000);
@@ -890,7 +799,7 @@ async function loadPricesCard() {
             const v = tonight(p);
             return `<div class="player-row">
                 <div class="player-info"><div class="player-name">${p.name}</div><div class="player-meta">${p.team} • £${safeNumber(p.price, 1)}m</div></div>
-                <div class="player-stats"><div class="stat"><div class="stat-value" style="color:${v >= 0 ? '#16a34a' : '#e0004d'};">${v > 0 ? '+' : ''}${safeNumber(v, 0)}%</div><div class="stat-label">${t('pcTonight')}</div></div></div>
+                <div class="player-stats"><div class="stat"><div class="stat-value" style="color:${v >= 0 ? 'var(--positive)' : 'var(--negative)'};">${v > 0 ? '+' : ''}${safeNumber(v, 0)}%</div><div class="stat-label">${t('pcTonight')}</div></div></div>
             </div>`;
         };
         content.innerHTML = `<h4 style="margin:0 0 6px;">${t('pcYourSquad')}</h4><div class="team-grid">${squad.map(row).join('')}</div>

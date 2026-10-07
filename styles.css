@@ -44,6 +44,43 @@
     --gradient-secondary: linear-gradient(135deg, #00cc6a 0%, #00ff87 100%);
     --gradient-accent: linear-gradient(135deg, #ff2882 0%, #ff6baa 100%);
     --gradient-grass: linear-gradient(180deg, #1a6b2e 0%, #2d8f3f 50%, #1a6b2e 100%);
+
+    /* Semantic colours: use these instead of hex values in pages and scripts */
+    --positive: #16a34a;            /* gains, rises, good */
+    --negative: #e0004d;            /* losses, falls, hits */
+    --warning: #d97706;
+    --neutral: #9ca3af;
+    --highlight: rgba(0, 255, 135, 0.14);   /* "you" row, best value */
+    --on-accent: #37003c;           /* text on the neon green */
+    --header-bg: #37003c;           /* table headers, active chips: white text on it in both themes */
+    --border-strong: rgba(55, 0, 60, 0.25);   /* outlines of chips, panels and controls */
+
+    /* Position colours */
+    --pos-gkp: #f59e0b;
+    --pos-def: #3b82f6;
+    --pos-mid: #8b5cf6;
+    --pos-fwd: #ef4444;
+
+    /* Availability flags (FPL site colours) */
+    --flag-doubt: #ffe65b;
+    --flag-risk: #ff9f43;
+    --flag-out: #e0004d;
+
+    /* Spacing, radius and type scale */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --space-6: 32px;
+    --radius-sm: 6px;
+    --radius: 10px;
+    --radius-lg: 16px;
+    --fs-xs: 0.72rem;
+    --fs-sm: 0.82rem;
+    --fs-md: 0.95rem;
+    --fs-lg: 1.15rem;
+    --fs-xl: 1.6rem;
 }
 
 body {
@@ -248,27 +285,27 @@ header h1 {
 
 /* Card color themes */
 .card[data-card="team"] {
-    background: #ffffff;
+    background: var(--card-bg);
     border-top: 3px solid var(--primary-color);
 }
 
 .card[data-card="performance"] {
-    background: #ffffff;
+    background: var(--card-bg);
     border-top: 3px solid var(--secondary-dark);
 }
 
 .card[data-card="database"] {
-    background: #ffffff;
+    background: var(--card-bg);
     border-top: 3px solid var(--primary-light);
 }
 
 .card[data-card="prediction"] {
-    background: #ffffff;
+    background: var(--card-bg);
     border-top: 3px solid #f59e0b;
 }
 
 .card[data-card="transfers"] {
-    background: #ffffff;
+    background: var(--card-bg);
     border-top: 3px solid var(--accent-color);
 }
 
@@ -549,14 +586,14 @@ header h1 {
 }
 
 /* Compact dashboard table - fits viewport without horizontal scroll */
-table.table-compact {
+#players-table.table-compact {
     width: 100%;
     min-width: unset;
     table-layout: auto;
 }
 
-table.table-compact th,
-table.table-compact td {
+#players-table.table-compact th,
+#players-table.table-compact td {
     padding: 7px 4px;
     font-size: 0.78em;
     white-space: nowrap;
@@ -564,8 +601,8 @@ table.table-compact td {
 }
 
 /* Name col gets remaining space but won't push numeric cols off-screen */
-table.table-compact th:first-child,
-table.table-compact td:first-child {
+#players-table.table-compact th:first-child,
+#players-table.table-compact td:first-child {
     text-align: left;
     width: 99%;      /* grabs all browser-allocated slack */
     max-width: 180px;
@@ -581,8 +618,8 @@ table.table-compact td:first-child {
 @media (max-width: 768px) {
     .col-hide-lg { display: none; }
     .col-hide-md { display: none; }
-    table.table-compact th:first-child,
-    table.table-compact td:first-child { max-width: 140px; }
+    #players-table.table-compact th:first-child,
+    #players-table.table-compact td:first-child { max-width: 140px; }
 }
 
 /* ≤480px: also hide Team, Pos, £ — visible: Name · Goals · Assists · Pts · Form */
@@ -590,8 +627,8 @@ table.table-compact td:first-child {
     .col-hide-lg { display: none; }
     .col-hide-md { display: table-cell; }  /* re-show Goals + Assists */
     .col-hide-sm { display: none; }
-    table.table-compact th:first-child,
-    table.table-compact td:first-child { max-width: 110px; }
+    #players-table.table-compact th:first-child,
+    #players-table.table-compact td:first-child { max-width: 110px; }
 }
 
 .table-container::-webkit-scrollbar {
@@ -605,7 +642,7 @@ table.table-compact td:first-child {
 }
 
 .table-container::-webkit-scrollbar-thumb {
-    background: var(--primary-color);
+    background: var(--header-bg);
     border-radius: 5px;
 }
 
@@ -613,14 +650,14 @@ table.table-compact td:first-child {
     background: #4a0050;
 }
 
-table {
+#players-table {
     width: 100%;
     border-collapse: collapse;
     min-width: 3500px;
 }
 
-th {
-    background: var(--primary-color);
+#players-table th {
+    background: var(--header-bg);
     color: white;
     padding: 12px 8px;
     text-align: center;
@@ -635,20 +672,20 @@ th {
     white-space: nowrap;
 }
 
-th:first-child {
+#players-table th:first-child {
     position: sticky;
     left: 0;
     z-index: 11;
     text-align: left;
-    background: var(--primary-color);
+    background: var(--header-bg);
 }
 
-th:hover {
+#players-table th:hover {
     background: var(--primary-light);
     color: var(--secondary-color);
 }
 
-td {
+#players-table td {
     padding: 10px 6px;
     border-bottom: 1px solid var(--border-color);
     text-align: center;
@@ -657,7 +694,7 @@ td {
     color: var(--text-color);
 }
 
-td:first-child {
+#players-table td:first-child {
     position: sticky;
     left: 0;
     background: white;
@@ -668,58 +705,58 @@ td:first-child {
     color: var(--primary-color);
 }
 
-tbody tr {
+#players-table tbody tr {
     transition: all 0.2s ease;
 }
 
-tbody tr:hover {
+#players-table tbody tr:hover {
     background: rgba(55, 0, 60, 0.04);
     box-shadow: inset 3px 0 0 var(--primary-color);
 }
 
-tbody tr:hover td:first-child {
+#players-table tbody tr:hover td:first-child {
     background: rgba(55, 0, 60, 0.04);
 }
 
 /* Form-based row shading — green=good, red=poor, good contrast on white */
-tbody tr.row-form-elite {
+#players-table tbody tr.row-form-elite {
     background: rgba(0, 204, 106, 0.14);
     border-left: 3px solid #00a854;
 }
-tbody tr.row-form-elite td:first-child {
+#players-table tbody tr.row-form-elite td:first-child {
     background: rgba(0, 204, 106, 0.14);
     color: #00622f;
 }
 
-tbody tr.row-form-good {
+#players-table tbody tr.row-form-good {
     background: rgba(0, 204, 106, 0.07);
     border-left: 3px solid #00cc6a;
 }
-tbody tr.row-form-good td:first-child {
+#players-table tbody tr.row-form-good td:first-child {
     background: rgba(0, 204, 106, 0.07);
 }
 
-tbody tr.row-form-avg {
+#players-table tbody tr.row-form-avg {
     background: rgba(245, 158, 11, 0.09);
     border-left: 3px solid #d97706;
 }
-tbody tr.row-form-avg td:first-child {
+#players-table tbody tr.row-form-avg td:first-child {
     background: rgba(245, 158, 11, 0.09);
 }
 
-tbody tr.row-form-low {
+#players-table tbody tr.row-form-low {
     background: rgba(255, 40, 130, 0.07);
     border-left: 3px solid #ff2882;
 }
-tbody tr.row-form-low td:first-child {
+#players-table tbody tr.row-form-low td:first-child {
     background: rgba(255, 40, 130, 0.07);
 }
 
-tbody tr.row-form-poor {
+#players-table tbody tr.row-form-poor {
     background: rgba(220, 38, 38, 0.08);
     border-left: 3px solid #dc2626;
 }
-tbody tr.row-form-poor td:first-child {
+#players-table tbody tr.row-form-poor td:first-child {
     background: rgba(220, 38, 38, 0.08);
 }
 
@@ -1316,7 +1353,7 @@ tbody tr.row-form-poor td:first-child {
 
 .transfer-reason {
     font-size: 0.9em;
-    color: #666;
+    color: var(--text-muted);
     font-style: italic;
 }
 
@@ -1890,7 +1927,7 @@ tbody tr.row-form-poor td:first-child {
     font-size: 0.82em;
 }
 .cmp-table th {
-    background: var(--primary-color);
+    background: var(--header-bg);
     color: white;
     padding: 9px 10px;
     text-align: center;
@@ -1902,7 +1939,7 @@ tbody tr.row-form-poor td:first-child {
 }
 .cmp-table th:first-child {
     text-align: left;
-    background: var(--primary-color);
+    background: var(--header-bg);
     position: sticky;
     left: 0;
     z-index: 6;
@@ -1999,6 +2036,13 @@ tbody tr.row-form-poor td:first-child {
     --shadow-hover: 0 8px 28px rgba(0, 255, 135, 0.14);
     /* Override primary so inline color:var(--primary-color) is readable */
     --primary-color: #c084fc;
+
+    --positive: #4ade80;
+    --negative: #ff5c8a;
+    --warning: #fbbf24;
+    --highlight: rgba(0, 255, 135, 0.12);
+    --header-bg: #4b0f57;
+    --border-strong: rgba(255, 255, 255, 0.22);
 }
 
 [data-theme="dark"] body {
@@ -2027,24 +2071,24 @@ tbody tr.row-form-poor td:first-child {
     background: var(--bg-surface);
     border-color: var(--card-border);
 }
-[data-theme="dark"] th {
+[data-theme="dark"] #players-table th {
     background: rgba(55, 0, 60, 0.85) !important;
     color: rgba(240, 236, 250, 0.95) !important;
     border-color: var(--border-color) !important;
 }
-[data-theme="dark"] td {
+[data-theme="dark"] #players-table td {
     color: var(--text-color);
     border-color: var(--border-color);
 }
-[data-theme="dark"] td:first-child {
+[data-theme="dark"] #players-table td:first-child {
     color: var(--secondary-color);
     background: var(--card-bg);
 }
-[data-theme="dark"] tbody tr:hover td:first-child {
+[data-theme="dark"] #players-table tbody tr:hover td:first-child {
     background: rgba(0, 255, 135, 0.07);
 }
 
-[data-theme="dark"] tbody tr:hover {
+[data-theme="dark"] #players-table tbody tr:hover {
     background-color: rgba(0, 255, 135, 0.07) !important;
 }
 
@@ -2063,17 +2107,17 @@ tbody tr.row-form-poor td:first-child {
 .form-badge-poor  { background: #dc2626; }
 
 /* Form row shading — adjusted for dark background */
-[data-theme="dark"] tbody tr.row-form-elite { background-color: rgba(0, 204, 106, 0.14) !important; }
-[data-theme="dark"] tbody tr.row-form-good  { background-color: rgba(0, 204, 106, 0.09) !important; }
-[data-theme="dark"] tbody tr.row-form-avg   { background-color: rgba(245, 158, 11, 0.10) !important; }
-[data-theme="dark"] tbody tr.row-form-low   { background-color: rgba(234, 88, 12, 0.12) !important; }
-[data-theme="dark"] tbody tr.row-form-poor  { background-color: rgba(220, 38, 38, 0.16) !important; }
+[data-theme="dark"] #players-table tbody tr.row-form-elite { background-color: rgba(0, 204, 106, 0.14) !important; }
+[data-theme="dark"] #players-table tbody tr.row-form-good  { background-color: rgba(0, 204, 106, 0.09) !important; }
+[data-theme="dark"] #players-table tbody tr.row-form-avg   { background-color: rgba(245, 158, 11, 0.10) !important; }
+[data-theme="dark"] #players-table tbody tr.row-form-low   { background-color: rgba(234, 88, 12, 0.12) !important; }
+[data-theme="dark"] #players-table tbody tr.row-form-poor  { background-color: rgba(220, 38, 38, 0.16) !important; }
 /* Fix td:first-child name color — light-mode rule (color:#00622f) wins on specificity, must beat it */
-[data-theme="dark"] tbody tr.row-form-elite td:first-child { color: #4ade80 !important; background: rgba(0, 204, 106, 0.14) !important; }
-[data-theme="dark"] tbody tr.row-form-good  td:first-child { color: #86efac !important; background: rgba(0, 204, 106, 0.09) !important; }
-[data-theme="dark"] tbody tr.row-form-avg   td:first-child { color: #fcd34d !important; background: rgba(245, 158, 11, 0.10) !important; }
-[data-theme="dark"] tbody tr.row-form-low   td:first-child { color: #fb923c !important; background: rgba(234, 88, 12, 0.12) !important; }
-[data-theme="dark"] tbody tr.row-form-poor  td:first-child { color: #f87171 !important; background: rgba(220, 38, 38, 0.16) !important; }
+[data-theme="dark"] #players-table tbody tr.row-form-elite td:first-child { color: #4ade80 !important; background: rgba(0, 204, 106, 0.14) !important; }
+[data-theme="dark"] #players-table tbody tr.row-form-good  td:first-child { color: #86efac !important; background: rgba(0, 204, 106, 0.09) !important; }
+[data-theme="dark"] #players-table tbody tr.row-form-avg   td:first-child { color: #fcd34d !important; background: rgba(245, 158, 11, 0.10) !important; }
+[data-theme="dark"] #players-table tbody tr.row-form-low   td:first-child { color: #fb923c !important; background: rgba(234, 88, 12, 0.12) !important; }
+[data-theme="dark"] #players-table tbody tr.row-form-poor  td:first-child { color: #f87171 !important; background: rgba(220, 38, 38, 0.16) !important; }
 /* ── Form badge dark mode overrides ── */
 [data-theme="dark"] .form-badge-elite { background: #00cc6a; color: #0a1a10; }
 [data-theme="dark"] .form-badge-good  { background: #22c55e; color: #0a1a10; }

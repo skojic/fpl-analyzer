@@ -13,34 +13,21 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Fixture Analyser - FPL Analyzer</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="components.css">
     <script src="theme.js"></script>
     <script src="lang.js"></script>
+    <script src="ui.js"></script>
     <style>
-        .container {
-            max-width: 1200px;
-        }
-        .card {
-            margin: 20px auto;
-            background: rgba(255, 255, 255, 0.98) !important;
-            border: 2px solid rgba(66, 181, 88, 0.3);
-        }
-        [data-theme="dark"] .card {
-            background: var(--bg-surface, #1a1030) !important;
-            border-color: var(--card-border, rgba(255,255,255,0.1));
-        }
-        .card-content {
-            max-height: none;
-        }
         .fx-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
         .fx-btn { border: 1.5px solid var(--primary-color); background: transparent; color: var(--primary-color); border-radius: 16px; padding: 4px 12px; font-size: 0.85em; font-weight: 700; cursor: pointer; }
-        .fx-btn.on { background: var(--primary-color); color: #fff; }
+        .fx-btn.on { background: var(--header-bg); color: #fff; }
         [data-theme="dark"] .fx-btn { color: #fff; }
         .fx-wrap { overflow-x: auto; }
-        /* Plain table: the global table styles are built for the wide, sticky player database */
-        .fx-table { width: 100%; min-width: 0; border-collapse: separate; border-spacing: 3px; font-size: 0.78em; }
-        .fx-table th, .fx-table td { position: static; white-space: nowrap; box-shadow: none; cursor: default; font-size: 1em; padding: 4px; border: none; }
+        .fx-table { width: 100%; border-collapse: separate; border-spacing: 3px; font-size: 0.78em; }
+        .fx-table th, .fx-table td { white-space: nowrap; padding: 4px; }
+        .fx-table th { background: var(--header-bg); color: #fff; }
+        .fx-table td.fx-team { text-align: left; font-weight: 800; }
         .fx-table th { border-radius: 6px; }
-        .fx-table td.fx-team { background: transparent; text-align: left; font-weight: 800; color: inherit; }
         .fx-table td.fx-team img { width: 18px; height: 18px; vertical-align: middle; margin-right: 4px; }
         .fx-cell { border-radius: 6px; text-align: center; color: #1a1a1a; font-weight: 700; line-height: 1.25; }
         .fx-cell small { display: block; font-weight: 600; opacity: 0.75; }
@@ -49,7 +36,7 @@
         .fx-sum { font-weight: 800; text-align: right; }
     </style>
 </head>
-<body>
+<body class="page page-wide">
     <div class="container">
         <header>
             <button class="back-btn" onclick="window.close()" title="Close" aria-label="Close">←</button>
