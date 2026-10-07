@@ -192,7 +192,8 @@ fpl-analyzer/
 ├── api/proxy.js            # Vercel serverless proxy for the FPL API
 ├── scripts/backtest.js     # Model accuracy backtest (`npm run backtest`)
 ├── scripts/build-data.js   # Recent form for every player + top-1,000 ownership
-├── data/                   # accuracy.json, recent-form.json, ownership.json (refreshed daily)
+├── scripts/build-odds.js   # Bookmaker odds → expected goals (The Odds API, free tier)
+├── data/                   # accuracy.json, recent-form.json, ownership.json, odds.json (refreshed daily)
 ├── .github/workflows/data.yml  # Free daily data refresh
 ├── vercel.json             # Vercel project config
 ├── package.json            # Node version for Vercel, `npm test`
@@ -273,7 +274,8 @@ Code: `prediction.js`. Projections cover the next 5 gameweeks from the next dead
    - Goals conceded (GKP/DEF): −1 per 2, saves (GKP): 1 per 3, both as Poisson expectations
    - Defensive contribution: 2 points × P(reaching 10 actions for DEF, 12 for MID/FWD)
    - Bonus from his own bonus rate, yellow cards −1
-6. **Squad value**: best valid XI (1 GKP, 3–5 DEF, 2–5 MID, 1–3 FWD) plus captain for each gameweek, with each gameweek weighted 0.9× the one before
+6. **Bookmaker odds** (when published): for upcoming matches, the daily job turns each match's 1X2 and over/under 2.5 odds (margin removed, averaged over bookmakers) into expected goals for both teams with the same Poisson model; these are blended with the team ratings (70% odds) for goals, assists, clean sheets, goals conceded and saves. Matches without odds use the ratings alone
+7. **Squad value**: best valid XI (1 GKP, 3–5 DEF, 2–5 MID, 1–3 FWD) plus captain for each gameweek, with each gameweek weighted 0.9× the one before
 
 ## Browser Compatibility
 

@@ -107,6 +107,8 @@ const Predictor = {
     HOME_ADVANTAGE: 1.1,    // goal multiplier at home (away = 1 / this)
     PRIOR_GAMES: 6,         // team ratings: weight (in matches) of FPL's strength rating vs this season's xG
     PRIOR_MINUTES: 270,     // player rates: minutes of position-average data blended into per-90 stats
+    ODDS_WEIGHT: 0.7,       // weight of bookmaker odds vs the team ratings for matches that have odds
+    ODDS_MAX_AGE_DAYS: 4,   // odds older than this are ignored
     RECENT_MATCHES: 5,      // matches of element-summary history used for the minutes model
     START_MINUTES: 85,      // typical minutes for a starter
     SUB_MINUTES: 20,        // typical minutes for a substitute appearance
@@ -120,15 +122,40 @@ const Predictor = {
     async getContext(length = this.HORIZON) {
         if (this.contexts[length]) return this.contexts[length];
 
-        const [bootstrap, fixtures] = await Promise.all([FPL_API.getBootstrapStatic(), FPL_API.getFixtures()]);
+        const [bootstrap, fixtures, odds] = await Promise.all([FPL_API.getBootstrapStatic(), FPL_API.getFixtures(), this.loadOdds()]);
         await this.loadPublishedForm(bootstrap);
-        this.contexts[length] = this.buildContext(bootstrap, fixtures, null, length);
+        this.contexts[length] = this.buildContext(bootstrap, fixtures, null, length, odds);
         return this.contexts[length];
+    },
+
+    // Bookmaker odds per fixture, published by scripts/build-odds.js (empty when missing or stale)
+    async loadOdds() {
+        if (this.oddsPromise) return this.oddsPromise;
+        this.oddsPromise = (async () => {
+            try {
+                let data;
+                if (FPL_API.IS_BROWSER) {
+                    const response = await fetch('data/odds.json', { cache: 'no-cache' });
+                    if (!response.ok) return {};
+                    data = await response.json();
+                } else {
+                    const file = require('path').join(__dirname, 'data', 'odds.json');
+                    if (!require('fs').existsSync(file)) return {};
+                    data = JSON.parse(require('fs').readFileSync(file, 'utf8'));
+                }
+                const ageDays = (Date.now() - new Date(data.generated).getTime()) / 86400000;
+                return ageDays <= this.ODDS_MAX_AGE_DAYS ? data.fixtures || {} : {};
+            } catch (error) {
+                console.error('Odds unavailable:', error.message);
+                return {};
+            }
+        })();
+        return this.oddsPromise;
     },
 
     // Context from raw bootstrap + fixtures. `nextEventId` overrides the next gameweek
     // (the backtest rebuilds the season as it stood before a past gameweek).
-    buildContext(bootstrap, fixtures, nextEventId = null, length = this.HORIZON) {
+    buildContext(bootstrap, fixtures, nextEventId = null, length = this.HORIZON, odds = {}) {
         // Horizon: the next N gameweeks (transfers made now count from the next deadline)
         const next = nextEventId ? bootstrap.events.find(e => e.id === nextEventId) : bootstrap.events.find(e => e.is_next);
         const horizon = next
@@ -155,7 +182,7 @@ const Predictor = {
             ]) {
                 const byEvent = fixturesByTeam[team] || (fixturesByTeam[team] = {});
                 (byEvent[f.event] || (byEvent[f.event] = [])).push({
-                    event: f.event, opponentId: opponent, isHome, difficulty, kickoffTime: f.kickoff_time
+                    fixtureId: f.id, event: f.event, opponentId: opponent, isHome, difficulty, kickoffTime: f.kickoff_time
                 });
             }
         }
@@ -216,7 +243,7 @@ const Predictor = {
             };
         }
 
-        return { bootstrap, horizon, fixturesByTeam, teamGames, teams, leagueAvg, positionRates };
+        return { bootstrap, horizon, fixturesByTeam, teamGames, teams, leagueAvg, positionRates, odds };
     },
 
     // ── Minutes model ────────────────────────────────────────────────────────
@@ -335,6 +362,24 @@ const Predictor = {
         return ((parseFloat(total) || 0) + posRate * this.PRIOR_MINUTES / 90) / ((minutes + this.PRIOR_MINUTES) / 90);
     },
 
+    // Goals a team is expected to score and concede in a fixture: team ratings with home advantage,
+    // blended with the bookmakers' expected goals when odds are published for the match
+    fixtureGoals(teamId, opponentId, isHome, fixtureId, ctx) {
+        const own = ctx.teams[teamId];
+        const opp = ctx.teams[opponentId];
+        const home = isHome ? this.HOME_ADVANTAGE : 1 / this.HOME_ADVANTAGE;
+        let scored = ctx.leagueAvg * own.attack * opp.defence * home;
+        let conceded = ctx.leagueAvg * opp.attack * own.defence / home;
+        const market = (ctx.odds || {})[fixtureId];
+        if (market) {
+            const [oddsFor, oddsAgainst] = isHome ? [market.goalsHome, market.goalsAway] : [market.goalsAway, market.goalsHome];
+            const blend = (model, odds) => Math.pow(model, 1 - this.ODDS_WEIGHT) * Math.pow(odds, this.ODDS_WEIGHT);
+            scored = blend(scored, oddsFor);
+            conceded = blend(conceded, oddsAgainst);
+        }
+        return { scored, conceded, fromOdds: !!market };
+    },
+
     // ── Points for one fixture, given he is available ───────────────────────
     calculateFixturePoints(player, fixture, ctx, minutes) {
         const R = this.SCORING_RULES;
@@ -343,12 +388,13 @@ const Predictor = {
         const opp = ctx.teams[fixture.opponentId];
         if (!own || !opp) return 0;
 
-        const home = fixture.isHome ? this.HOME_ADVANTAGE : 1 / this.HOME_ADVANTAGE;
+        const goals = this.fixtureGoals(player.teamId, fixture.opponentId, fixture.isHome, fixture.fixtureId, ctx);
         const minutesShare = minutes.expectedMinutes / 90;
-        // His attacking rates already reflect his own team; scale by the opponent's defence
-        const attackMult = opp.defence * home;
+        // His attacking rates already reflect his own team's strength: scale by how this match
+        // compares with his team's average (opponent, home / away, odds)
+        const attackMult = goals.scored / (ctx.leagueAvg * own.attack);
         // Goals his team is expected to concede in this match
-        const concede = ctx.leagueAvg * opp.attack * own.defence / home;
+        const concede = goals.conceded;
         let points = 0;
 
         // Appearance: 2 for 60+ minutes, 1 for less
@@ -369,7 +415,7 @@ const Predictor = {
 
         if (pos === 'GKP') {
             // Saves: 1 per 3; a stronger opponent attack means more shots to save
-            const saves = this.getRate(player, player.saves, 'saves', ctx) * opp.attack / home * this.START_MINUTES / 90;
+            const saves = this.getRate(player, player.saves, 'saves', ctx) * concede / (ctx.leagueAvg * own.defence) * this.START_MINUTES / 90;
             points += minutes.pStart * this.expectedPerN(saves, 3) * R.saves.GKP;
             // Penalty saves: roughly one penalty every 4 matches, about 1 in 5 saved
             points += minutes.pStart * 0.25 * 0.2 * R.penaltySaved;
@@ -647,15 +693,14 @@ const Predictor = {
             const col = events.indexOf(f.event);
             if (col < 0 || f.finished) continue;
             for (const [teamId, oppId, isHome, fdr] of [[f.team_h, f.team_a, true, f.team_h_difficulty], [f.team_a, f.team_h, false, f.team_a_difficulty]]) {
-                const own = ctx.teams[teamId];
-                const opp = ctx.teams[oppId];
-                const home = isHome ? this.HOME_ADVANTAGE : 1 / this.HOME_ADVANTAGE;
+                const goals = this.fixtureGoals(teamId, oppId, isHome, f.id, ctx);
                 rows[teamId].cells[col].push({
-                    opponent: opp.shortName,
+                    opponent: ctx.teams[oppId].shortName,
                     isHome,
                     fdr,
-                    xgFor: ctx.leagueAvg * own.attack * opp.defence * home,
-                    csProb: Math.exp(-ctx.leagueAvg * opp.attack * own.defence / home)
+                    xgFor: goals.scored,
+                    csProb: Math.exp(-goals.conceded),
+                    fromOdds: goals.fromOdds
                 });
             }
         }

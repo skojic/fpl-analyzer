@@ -8,6 +8,7 @@ const Predictor = require('./prediction.js');
 global.Predictor = Predictor; // league.js expects the browser global
 const League = require('./league.js');
 const Live = require('./live.js');
+const Odds = require('./scripts/build-odds.js');
 const proxy = require('./api/proxy.js');
 
 // Minimal stand-in for Vercel's request/response objects
@@ -185,6 +186,46 @@ const tests = [
             if (o.total !== r.total || o.event_total !== r.points) throw new Error(`${r.team}: ${r.points}/${r.total} vs ${o.event_total}/${o.total}`);
         }
         return `${table.length} managers`;
+    }],
+    ['Odds: market maths and team names', async () => {
+        const close = (a, b, tol = 0.002) => Math.abs(a - b) < tol;
+        const market = { home: 0.45, draw: 0.27, away: 0.28, over25: 0.5 };
+        const g = Odds.expectedGoals(market);
+        if (!close(Odds.pOver25(g.total), 0.5)) throw new Error(`total ${g.total}`);
+        const o = Odds.outcome(g.home, g.away);
+        if (!close(o.pHome / (o.pHome + o.pAway), 0.45 / 0.73)) throw new Error('home share');
+        const bootstrap = await FPL_API.getBootstrapStatic();
+        const keys = new Set(bootstrap.teams.map(t => Odds.teamKey(t.name)));
+        if (keys.size !== bootstrap.teams.length) throw new Error('two FPL teams share a key');
+        for (const [oddsName, fplShort] of [['Manchester City', 'MCI'], ['Manchester United', 'MUN'], ['Tottenham Hotspur', 'TOT'],
+            ['Nottingham Forest', 'NFO'], ['Brighton and Hove Albion', 'BHA'], ['AFC Bournemouth', 'BOU'], ['Leeds United', 'LEE']]) {
+            const team = bootstrap.teams.find(t => t.short_name === fplShort);
+            if (team && Odds.teamKey(oddsName) !== Odds.teamKey(team.name)) throw new Error(`${oddsName} does not map to ${team.name}`);
+        }
+        return `even-ish match -> ${g.home.toFixed(2)} v ${g.away.toFixed(2)}`;
+    }],
+    ['Odds: sample market maps to a fixture and is blended into the model', async () => {
+        const [bootstrap, fixtures] = await Promise.all([FPL_API.getBootstrapStatic(), FPL_API.getFixtures()]);
+        const f = fixtures.find(x => !x.finished && x.event);
+        if (!f) return 'no upcoming fixture';
+        const name = id => bootstrap.teams.find(t => t.id === id).name;
+        const event = {
+            home_team: name(f.team_h), away_team: name(f.team_a), commence_time: f.kickoff_time,
+            bookmakers: [{ markets: [
+                { key: 'h2h', outcomes: [{ name: name(f.team_h), price: 1.5 }, { name: 'Draw', price: 4.5 }, { name: name(f.team_a), price: 7 }] },
+                { key: 'totals', outcomes: [{ name: 'Over', point: 2.5, price: 1.7 }, { name: 'Under', point: 2.5, price: 2.2 }] }
+            ] }]
+        };
+        const { fixtures: matched, unmatched } = Odds.buildOdds([event], bootstrap, fixtures);
+        if (!matched[f.id] || unmatched.length) throw new Error('sample event not matched to its fixture');
+        const plain = Predictor.buildContext(bootstrap, fixtures, null, 5);
+        const withOdds = Predictor.buildContext(bootstrap, fixtures, null, 5, matched);
+        const a = Predictor.fixtureGoals(f.team_h, f.team_a, true, f.id, plain);
+        const b = Predictor.fixtureGoals(f.team_h, f.team_a, true, f.id, withOdds);
+        const target = matched[f.id].goalsHome;
+        const between = (x, lo, hi) => x >= Math.min(lo, hi) - 1e-9 && x <= Math.max(lo, hi) + 1e-9;
+        if (!b.fromOdds || !between(b.scored, a.scored, target)) throw new Error(`blend ${b.scored} not between ${a.scored} and ${target}`);
+        return `home xG ${a.scored.toFixed(2)} (model) -> ${b.scored.toFixed(2)} (odds ${target.toFixed(2)})`;
     }],
     ['Model: return date parsing', async () => {
         const d = Predictor.parseReturnDate('Hamstring injury - Expected back 18 Oct');

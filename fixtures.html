@@ -114,7 +114,7 @@
                 row.cells.forEach((cell, i) => {
                     const faded = i < span ? '' : 'opacity:0.55;';
                     html += `<td style="${faded}">${cell.length
-                        ? cell.map(c => `<div class="fx-cell" style="background:${colour(m.value(c), min, max, m.better)};">${c.opponent} (${c.isHome ? 'H' : 'A'})<small>${m.label(c)}</small></div>`).join('')
+                        ? cell.map(c => `<div class="fx-cell" style="background:${colour(m.value(c), min, max, m.better)};">${c.opponent} (${c.isHome ? 'H' : 'A'})<small>${m.label(c)}${c.fromOdds && mode !== 'fdr' ? ' •' : ''}</small></div>`).join('')
                         : `<div class="fx-blank">${t('fxBlank')}</div>`}</td>`;
                 });
                 const total = sum(row);

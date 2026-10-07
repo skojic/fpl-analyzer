@@ -1,5 +1,5 @@
 # Daily data refresh, free on public repositories.
-# Rebuilds data/*.json (recent form, top-manager ownership, model accuracy) from the FPL API
+# Rebuilds data/*.json (recent form, top-manager ownership, bookmaker odds, model accuracy)
 # and commits them only when they change;
 # the push redeploys the site on Vercel.
 name: Data refresh
@@ -24,14 +24,19 @@ jobs:
       # Used only if the FPL API refuses direct requests from GitHub's servers
       FPL_PROXY: https://fpl-analyzer-eosin.vercel.app/api/proxy?url=
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
       - name: Recent form and top-manager ownership
         run: node scripts/build-data.js
+
+      - name: Bookmaker odds (skipped without the ODDS_API_KEY secret)
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+        run: node scripts/build-odds.js
 
       - name: Model accuracy backtest
         run: node scripts/backtest.js
