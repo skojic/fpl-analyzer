@@ -2,7 +2,7 @@
 
 A comprehensive web application for analyzing and optimizing your Fantasy Premier League team using real-time data from the official FPL API.
 
-Link to the APP: https://fpl-analyzer-fpl-analyzer1.vercel.app/
+Link to the APP: https://fpl-analyzer-eosin.vercel.app/
 
 ## Features
 
