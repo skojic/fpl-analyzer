@@ -1827,6 +1827,14 @@ header h1 {
     font-weight: 700;
     text-decoration: none;
 }
+/* Link to the full guide, next to the author */
+.site-footer .footer-guide,
+.site-footer .footer-guide:visited,
+.site-footer .footer-guide:hover {
+    color: var(--primary-color);
+    font-weight: 700;
+    text-decoration: none;
+}
 .site-footer .footer-sep {
     margin: 0 12px;
     opacity: 0.35;

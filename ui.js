@@ -228,7 +228,7 @@ UI.addIconSprite = function () {
 
 // ── App navigation: tabs on top (bottom bar on phones), sub-pages as pills, same-tab links ──
 UI.TABS = [
-    { key: 'home', icon: 'home', label: 'navHome', pages: [['index.html', 'navHome']] },
+    { key: 'home', icon: 'home', label: 'navHome', pages: [['index.html', 'navHome'], ['guide.html', null]] },
     { key: 'team', icon: 'shirt', label: 'navTeam', pages: [['team.html', 'cardMyTeam'], ['lineup.html', 'cardLineup'], ['nextgw.html', 'cardNextGW'], ['prediction.html', 'cardPrediction']] },
     { key: 'transfers', icon: 'transfers', label: 'navTransfers', pages: [['transfers.html', 'cardTransfers'], ['optimizer.html', 'cardOptimizer']] },
     { key: 'league', icon: 'trophy', label: 'navLeague', pages: [['league.html', 'cardLeague'], ['live.html', 'cardLive'], ['performance.html', 'cardPerformance']] },
@@ -362,6 +362,7 @@ UI.openGuide = function () {
     overlay.innerHTML = `<div class="ui-modal-box">
             <div class="ui-modal-head"><h2>${t('guideTitle')}</h2>
                 <button class="ui-modal-close" type="button" onclick="UI.closeGuide()" aria-label="${t('guideClose')}">×</button></div>
+            <a class="ui-guide-full" href="guide.html">${t('guideFull')} →</a>
             <p class="ui-meta">${t('guideIntro')}</p>
             ${UI.GUIDE.map(([key, title, page]) => `<section class="ui-guide-item">
                 <h3>${t(title)}${page !== 'player.html' ? ` <a href="${page}">${t('guideOpen')} →</a>` : ''}</h3>

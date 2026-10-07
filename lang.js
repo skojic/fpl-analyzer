@@ -13,7 +13,7 @@ const TRANSLATIONS = {
         analysis:           'Analysis',
         footerText:         'Made with',
         footerBy:           'for you by',
-        footerHtml:         'Made with <span class="heart">&#x2665;</span> for you by <a class="footer-author" href="https://github.com/skojic" target="_blank" rel="noopener">Srdjan Kojic</a>',
+        footerHtml:         'Made with <span class="heart">&#x2665;</span> for you by <a class="footer-author" href="https://github.com/skojic" target="_blank" rel="noopener">Srdjan Kojic</a> · <a class="footer-guide" href="guide.html">How it works</a>',
         dark:               'Dark',
         light:              'Light',
         close:              'Close',
@@ -452,6 +452,100 @@ const TRANSLATIONS = {
         noInjuryNews:       'No injury news',
         last:               'Last',
         gameweeks:          'Gameweeks',
+
+        /* ── Full guide page (guide.html) ── */
+        guideFull:          'Full guide: how the website works',
+        guardianGuide:      'How does this work?',
+        gp_title:           'How FPL Analyzer works',
+        gp_contents:        'Contents',
+        gp_top:             'Back to top',
+        gp_intro:           `<p>FPL Analyzer reads your Fantasy Premier League team from the official FPL API and adds its own projections: expected points for the next five gameweeks, the best lineup and captain, transfer plans, chip timing and where you stand in your mini-leagues. It is free and needs no login. This page explains how each part works, where the numbers come from and what their limits are.</p>`,
+        gp_start_title:     'Getting started',
+        gp_start:           `<h3>Your FPL team ID</h3>
+<p>Log in at <strong>fantasy.premierleague.com</strong> and open <strong>Points</strong>. In the address bar, <code>/entry/1234567/event/1/</code>, the number after <code>/entry/</code> is your team ID.</p>
+<h3>First visit and Change ID</h3>
+<p>On your first visit Home asks for the ID, checks with FPL that the team exists, saves it and reloads; a wrong number shows an error instead. Until an ID is saved, the other pages send you back to Home (this guide is the exception). <strong>Change ID</strong> in the Home header switches to another team, for example a rival's.</p>
+<h3>Where it is stored</h3>
+<p><strong>In this browser only</strong>, together with your language, theme, plan locks and bans and the transfers you enter yourself. Another browser or device asks for the ID again.</p>`,
+        gp_nav_title:       'Finding your way around',
+        gp_nav:             `<ul>
+<li><strong>Six tabs</strong> at the top: Home, My Team, Transfers, League, Players and Fixtures. On a phone they become a bar with icons at the bottom of the screen.</li>
+<li><strong>Sub-pages</strong> of a tab appear as buttons under the page title.</li>
+<li><strong>Guide</strong> in the top bar opens a short explanation of every page and the glossary, with a link to this page.</li>
+<li>The round <strong>i</strong> buttons on the Home cards and <em>How this page works</em> under a page title explain it in place. Words with a dotted underline (xPts, EO, FT, hit…) explain themselves when tapped.</li>
+<li><strong>Light or dark</strong>: the moon / sun button. Until you choose, the site follows your device. <strong>Language</strong>: the flags; both choices are remembered.</li>
+</ul>`,
+        gp_pages_title:     'The pages',
+        gp_pages:           `<h3>Home</h3>
+<p>Eight summary cards, each with an <strong>i</strong> button and an <em>Open</em> link to its full page. The My Team card switches between <strong>Current</strong> (your lineup as set), <strong>Suggested</strong> (the suggested lineup for the next gameweek) and <strong>Next GW</strong> (the next gameweek's matches with the bookmakers' favourite and your players in each). A banner warns about blank and double gameweeks ahead.</p>
+<h3>My Team</h3>
+<ul>
+<li><strong>My Team</strong>: your squad with each player's next opponent, coloured by FPL difficulty, and availability flags: yellow 75%, orange 50 or 25%, red out.</li>
+<li><strong>Suggested Lineup</strong>: the best XI, captain, vice-captain and bench order from your players, and what to change.</li>
+<li><strong>Next Gameweek</strong>: every match with the team the bookmakers favour, its chance of winning and your players.</li>
+<li><strong>Points Prediction</strong>: projected points per player and match, the captain pick and, at the bottom, <em>Model Accuracy</em> on past gameweeks.</li>
+</ul>
+<h3>Transfers</h3>
+<ul>
+<li><strong>Transfers I've made</strong>: FPL publishes transfers only after the deadline, so enter the ones you've already made in the FPL app. They are checked against your money and the 3-per-club limit, saved in this browser and used by every page until the deadline, then replaced by FPL's data.</li>
+<li><strong>Transfer Plan</strong>: five weeks of rolling, one or two transfers, with free transfers and hits. Tap a squad player to <em>lock</em> him (never sold); ⛔ next to a suggested buy <em>bans</em> him (never bought).</li>
+<li><strong>Best Single Transfers</strong>: the best options per position with the gain and a verdict: <em>Make it</em>, <em>Worth a −4</em> or <em>Marginal: consider rolling</em>.</li>
+<li><strong>AI Team &amp; Chips</strong>: your team rating, the best Wildcard and Free Hit squads and the chip calendar.</li>
+</ul>
+<h3>League</h3>
+<ul>
+<li><strong>Mini-League</strong>: standings, threats (players your rivals own and you don't), your differentials, rivals' captains and the template, from effective ownership. You can also compare with the overall top 1,000 managers.</li>
+<li><strong>Live Gameweek</strong>: live points with provisional bonus and automatic substitutions, a live league table and your overall rank.</li>
+<li><strong>Performance</strong>: your season's points and rank, and every gameweek against your average.</li>
+</ul>
+<h3>Players and Fixtures</h3>
+<ul>
+<li><strong>Player Database</strong>: every player's season stats; search, filter and sort. <strong>Player Comparison</strong>: up to three players side by side.</li>
+<li><strong>Price Changes</strong>: likely rises and falls tonight, from FPL's price predictor. Tap any player for his <strong>profile</strong>: stats, news, fixtures and match history.</li>
+<li><strong>Fixture Analyser</strong>: every team's next 3, 5 or 8 gameweeks with expected goals, clean-sheet chance and FPL difficulty, and the best runs for attackers and defenders.</li>
+</ul>`,
+        gp_model_title:     'How the predictions work',
+        gp_model:           `<p>Every player gets projected points (xPts) for each match of the next five gameweeks under this season's FPL scoring. A blank gameweek scores 0; a double counts both matches.</p>
+<ul>
+<li><strong>Minutes</strong>: his chances of starting, coming off the bench and playing 60+ minutes, from this season and his last five matches, the recent ones counting more.</li>
+<li><strong>Availability</strong>: FPL's chance of playing applies to the next gameweek. Later weeks use return dates in the news (“Expected back 18 Oct”); without a date, an injured or suspended player misses another week and then returns gradually.</li>
+<li><strong>Goals and assists</strong> from his xG and xA per 90 minutes, steadied with his position's average when he has played few minutes.</li>
+<li><strong>Team strength</strong> from each club's xG for and against this season, blended with FPL's own rating while few matches have been played. Home teams get 10% more goals.</li>
+<li><strong>Bookmaker odds</strong>: when a match is priced, its expected goals are 70% the bookmakers' and 30% the model's. Later matches use team ratings moved halfway towards the bookmakers' view of each team. Odds older than four days are ignored.</li>
+<li><strong>The rest</strong>: clean sheets and goals conceded from the goals his team should concede, saves (more against strong attacks), defensive contribution, bonus and yellow cards from his own rates.</li>
+</ul>
+<p>A squad is worth its best valid XI plus the captain counted twice, every week; each gameweek counts 90% of the one before, so nearer weeks matter more.</p>
+<h3>How the odds weights are measured</h3>
+<p>70% and 50% are starting values. The daily job keeps the last odds before every kickoff, and a backtest replays the finished gameweeks with several weights, comparing each projection with the points actually scored. Once two gameweeks with saved odds are measured, the site uses the weights that did best. The same backtest produces Model Accuracy.</p>`,
+        gp_decide_title:    'How transfers, plans and chips are decided',
+        gp_decide:          `<ul>
+<li><strong>Single transfers</strong>: every sale for an affordable player in the same position is scored by how much your best XI + captain improves over five weeks, within your selling prices (you keep half of a rise), bank and 3 players per club. With a free transfer a move above about 2 points is worth making; without one it must also cover the −4.</li>
+<li><strong>Transfer plan</strong>: each week the planner tries rolling, one or two transfers, paying 4 points beyond your free ones (one more each week, up to five). It keeps the 12 best plans after every week (beam search) and compares the best with rolling every week. Prices are assumed not to change.</li>
+<li><strong>AI Team</strong>: the optimizer looks for the best 15 within your budget (bank plus selling prices), swapping one or two players at a time until nothing improves. Wildcard = best squad over five weeks, Free Hit = best for the next week, rating = your squad's points as a share of the Wildcard squad's.</li>
+<li><strong>Chip calendar</strong>: for each chip you still have, per week: Bench Boost = your bench's points, Triple Captain = your captain's points once more, Free Hit = best one-week squad minus your XI. Later weeks assume no transfers, so treat them as a guide.</li>
+<li><strong>Mini-league</strong>: EO = how much of a player's points the average rival collects (captains count double); swing = (your multiplier − EO) × his projected points.</li>
+</ul>`,
+        gp_data_title:      'Where the data comes from',
+        gp_data:            `<ul>
+<li><strong>Official FPL API</strong> through the site's own proxy: answers are cached for 5 minutes, live points for 60 seconds, and the Live page refreshes every minute during matches.</li>
+<li><strong>Daily data job at 05:30 UTC</strong>: recent form for the minutes model, the ownership of the overall top 1,000 managers (once per gameweek), bookmaker odds, the odds history and the accuracy backtest.</li>
+<li><strong>Bookmaker odds</strong> from The Odds API, once a day: about 20 bookmakers, margin removed, averaged and turned into expected goals for both teams.</li>
+<li><strong>Overall rank estimate</strong>: about 30 pages of the overall table and 150 managers' live scores, refreshed every 10 minutes.</li>
+</ul>
+<p>The line at the bottom of each card shows its sources and how fresh they are, for example <em>FPL data today 10:42 · recent form today 05:53 · odds today 05:53</em>.</p>`,
+        gp_faq_title:       'Questions and limitations',
+        gp_faq:             `<h3>My transfer isn't showing</h3>
+<p>FPL publishes transfers only after the deadline. Until then, add them under <strong>Transfers I've made</strong> on the Transfers page; a ✎ note shows they are included.</p>
+<h3>Why is my overall rank marked ≈?</h3>
+<p>During a live gameweek it is an estimate. FPL's official rank replaces it once the gameweek is processed.</p>
+<h3>Why do the numbers change during the day?</h3>
+<p>Every page load fetches FPL data again (cached for up to 5 minutes), so news, prices and live points move. Odds and form are refreshed each morning, and prices change around midnight UK time.</p>
+<h3>Is my data stored anywhere?</h3>
+<p>Only in this browser. There are no accounts; the only requests go to the FPL API through the site's proxy and to the site's own data files.</p>
+<h3>Do I need to pay or log in?</h3>
+<p>No. It is free and never asks for your FPL password.</p>
+<h3>How accurate are the predictions?</h3>
+<p>They are averages, not certainties: 5 projected points can easily become 2 or 15. Early in the season they lean on FPL's ratings and players have few minutes, so they are less reliable, and late team news can surprise them. Model Accuracy on the Points Prediction page shows how the model has done.</p>`,
     },
 
     sr: {
@@ -461,7 +555,7 @@ const TRANSLATIONS = {
         analysis:           'Analiza',
         footerText:         'Napravljeno s',
         footerBy:           'za tebe od strane',
-        footerHtml:         'Napravljeno sa <span class="heart">&#x2665;</span> za tebe, autor <a class="footer-author" href="https://github.com/skojic" target="_blank" rel="noopener">Srdjan Kojic</a>',
+        footerHtml:         'Napravljeno sa <span class="heart">&#x2665;</span> za tebe, autor <a class="footer-author" href="https://github.com/skojic" target="_blank" rel="noopener">Srdjan Kojic</a> · <a class="footer-guide" href="guide.html">Kako radi</a>',
         dark:               'Tamna',
         light:              'Svetla',
         close:              'Zatvori',
@@ -900,6 +994,100 @@ const TRANSLATIONS = {
         noInjuryNews:       'Bez vesti o povredama',
         last:               'Poslednjih',
         gameweeks:          'Kola',
+
+        /* ── Full guide page (guide.html) ── */
+        guideFull:          'Ceo vodič: kako sajt radi',
+        guardianGuide:      'Kako ovo radi?',
+        gp_title:           'Kako radi FPL Analyzer',
+        gp_contents:        'Sadržaj',
+        gp_top:             'Na vrh',
+        gp_intro:           `<p>FPL Analyzer čita tvoj Fantasy Premier League tim iz zvaničnog FPL API-ja i dodaje svoje projekcije: očekivane poene za narednih pet kola, najbolju postavu i kapitena, planove transfera, pravo vreme za čipove i tvoj položaj u mini-ligama. Besplatan je i ne traži prijavu. Ova stranica objašnjava kako radi svaki deo, odakle dolaze brojevi i koja su im ograničenja.</p>`,
+        gp_start_title:     'Prvi koraci',
+        gp_start:           `<h3>Tvoj FPL Tim ID</h3>
+<p>Prijavi se na <strong>fantasy.premierleague.com</strong> i otvori <strong>Points</strong>. U adresnoj traci, <code>/entry/1234567/event/1/</code>, broj posle <code>/entry/</code> je tvoj Tim ID.</p>
+<h3>Prva poseta i Promeni ID</h3>
+<p>Pri prvoj poseti Početna traži ID, proverava kod FPL-a da tim postoji, čuva ga i osvežava stranicu; za pogrešan broj prikazuje grešku. Dok ID nije sačuvan, ostale stranice te vraćaju na Početnu (izuzetak je ovaj vodič). <strong>Promeni ID</strong> u zaglavlju Početne prebacuje na drugi tim, na primer rivalov.</p>
+<h3>Gde se čuva</h3>
+<p><strong>Samo u ovom pregledaču</strong>, zajedno sa jezikom, temom, zaključanim i zabranjenim igračima u planu i transferima koje sam uneseš. Drugi pregledač ili uređaj ponovo traži ID.</p>`,
+        gp_nav_title:       'Snalaženje na sajtu',
+        gp_nav:             `<ul>
+<li><strong>Šest kartica</strong> na vrhu: Početna, Moj Tim, Transferi, Liga, Igrači i Raspored. Na telefonu postaju traka sa ikonama na dnu ekrana.</li>
+<li><strong>Podstranice</strong> kartice su dugmad ispod naslova stranice.</li>
+<li><strong>Vodič</strong> u gornjoj traci otvara kratko objašnjenje svake stranice i rečnik, sa linkom ka ovoj stranici.</li>
+<li>Okrugla dugmad <strong>i</strong> na karticama Početne i <em>Kako radi ova stranica</em> ispod naslova stranice objašnjavaju je na licu mesta. Reči podvučene tačkicama (xPts, EO, BT, minus…) objašnjavaju se kada ih dodirneš.</li>
+<li><strong>Svetla ili tamna tema</strong>: dugme mesec / sunce. Dok ne izabereš, sajt prati tvoj uređaj. <strong>Jezik</strong>: zastavice; oba izbora se pamte.</li>
+</ul>`,
+        gp_pages_title:     'Stranice',
+        gp_pages:           `<h3>Početna</h3>
+<p>Osam kartica sa pregledom, svaka sa dugmetom <strong>i</strong> i linkom <em>Otvori</em> ka punoj stranici. Kartica Moj Tim se prebacuje između prikaza <strong>Trenutna</strong> (tvoja postava kako je namešteno), <strong>Predložena</strong> (predložena postava za sledeće kolo) i <strong>Sledeće kolo</strong> (utakmice sledećeg kola sa favoritom kladionica i tvojim igračima u svakoj). Obaveštenje upozorava na predstojeća kola bez utakmica i dupla kola.</p>
+<h3>Moj Tim</h3>
+<ul>
+<li><strong>Moj Tim</strong>: tvoj tim sa sledećim protivnikom svakog igrača, obojenim po FPL težini, i oznakama dostupnosti: žuta 75%, narandžasta 50 ili 25%, crvena ne igra.</li>
+<li><strong>Predložena Postava</strong>: najboljih 11, kapiten, zamenik i redosled na klupi od tvojih igrača, i šta treba promeniti.</li>
+<li><strong>Sledeće Kolo</strong>: svaka utakmica sa ekipom koju kladionice favorizuju, njenim šansama za pobedu i tvojim igračima.</li>
+<li><strong>Predikcija Poena</strong>: projektovani poeni po igraču i utakmici, izbor kapitena i, na dnu, <em>Tačnost Modela</em> u prošlim kolima.</li>
+</ul>
+<h3>Transferi</h3>
+<ul>
+<li><strong>Transferi koje sam napravio</strong>: FPL objavljuje transfere tek posle roka, pa ovde unesi one koje si već napravio u FPL aplikaciji. Proveravaju se prema tvom novcu i limitu od 3 igrača po klubu, čuvaju se u ovom pregledaču i koriste na svim stranicama do roka, a onda ih zamenjuju FPL podaci.</li>
+<li><strong>Plan Transfera</strong>: pet kola čuvanja transfera, jednog ili dva transfera, sa besplatnim transferima i minusima. Dodirni igrača iz tima da ga <em>zaključaš</em> (nikad se ne prodaje); ⛔ pored predložene kupovine ga <em>zabranjuje</em> (nikad se ne kupuje).</li>
+<li><strong>Najbolji Pojedinačni Transferi</strong>: najbolje opcije po poziciji sa dobitkom i ocenom: <em>Isplati se</em>, <em>Vredi −4</em> ili <em>Marginalno: razmisli o čuvanju</em>.</li>
+<li><strong>AI Tim i Čipovi</strong>: ocena tvog tima, najbolji Wildcard i Free Hit timovi i kalendar čipova.</li>
+</ul>
+<h3>Liga</h3>
+<ul>
+<li><strong>Mini-Liga</strong>: tabela, pretnje (igrači koje imaju rivali, a ti ne), tvoji diferencijali, kapiteni rivala i šablon, iz efektivnog vlasništva. Možeš se porediti i sa najboljih 1.000 menadžera ukupno.</li>
+<li><strong>Kolo Uživo</strong>: poeni uživo sa privremenim bonusom i automatskim izmenama, tabela lige uživo i tvoj ukupan plasman.</li>
+<li><strong>Analitika Performansi</strong>: poeni i plasman u sezoni i svako kolo u odnosu na tvoj prosek.</li>
+</ul>
+<h3>Igrači i Raspored</h3>
+<ul>
+<li><strong>Baza Igrača</strong>: statistika sezone za sve igrače; pretraga, filteri i sortiranje. <strong>Poređenje Igrača</strong>: do tri igrača jedan pored drugog.</li>
+<li><strong>Promene Cena</strong>: verovatna poskupljenja i pojeftinjenja večeras, iz FPL-ovog predviđanja cena. Dodirni bilo kog igrača za njegov <strong>profil</strong>: statistiku, vesti, raspored i istoriju utakmica.</li>
+<li><strong>Analiza Rasporeda</strong>: naredna 3, 5 ili 8 kola svakog tima sa očekivanim golovima, šansom za čistu mrežu i FPL težinom, i najbolji raspored za napad i za odbranu.</li>
+</ul>`,
+        gp_model_title:     'Kako rade projekcije',
+        gp_model:           `<p>Svaki igrač dobija projektovane poene (xPts) za svaku utakmicu narednih pet kola, po FPL bodovanju ove sezone. Kolo bez utakmice donosi 0; u duplom kolu se računaju obe utakmice.</p>
+<ul>
+<li><strong>Minuti</strong>: šanse da startuje, uđe sa klupe i odigra 60+ minuta, iz ove sezone i njegovih poslednjih pet utakmica, pri čemu skorije vrede više.</li>
+<li><strong>Dostupnost</strong>: FPL šansa da igra važi za sledeće kolo. Kasnija kola koriste datume povratka iz vesti („Expected back 18 Oct”); bez datuma, povređen ili suspendovan igrač propušta još jedno kolo i zatim se postepeno vraća.</li>
+<li><strong>Golovi i asistencije</strong> iz njegovog xG i xA na 90 minuta, ublaženi prosekom njegove pozicije kada je odigrao malo minuta.</li>
+<li><strong>Snaga timova</strong> iz xG za i protiv svakog kluba ove sezone, uz FPL ocenu dok je odigrano malo utakmica. Domaćin dobija 10% više golova.</li>
+<li><strong>Kvote kladionica</strong>: kada utakmica ima kvote, njeni očekivani golovi su 70% od kladionica i 30% od modela. Kasnije utakmice koriste ocene timova pomerene do pola puta ka viđenju kladionica. Kvote starije od četiri dana se ne koriste.</li>
+<li><strong>Ostalo</strong>: čiste mreže i primljeni golovi iz golova koje bi njegov tim trebalo da primi, odbrane (više protiv jakih napada), defanzivni doprinos, bonus i žuti kartoni iz njegovih stopa.</li>
+</ul>
+<p>Tim vredi koliko njegovih najboljih 11 po važećoj formaciji plus kapiten računat dvaput, svako kolo; svako kolo vredi 90% prethodnog, pa bliža kola više znače.</p>
+<h3>Kako se mere težine kvota</h3>
+<p>70% i 50% su početne vrednosti. Dnevni posao čuva poslednje kvote pre svake utakmice, a provera ponavlja završena kola sa više težina i poredi svaku projekciju sa stvarno osvojenim poenima. Kada se izmere dva kola sa sačuvanim kvotama, sajt koristi težine koje su se najbolje pokazale. Ista provera daje Tačnost Modela.</p>`,
+        gp_decide_title:    'Kako se biraju transferi, plan i čipovi',
+        gp_decide:          `<ul>
+<li><strong>Pojedinačni transferi</strong>: svaka prodaja za igrača iste pozicije koga možeš da priuštiš ocenjuje se po tome koliko se tvojih najboljih 11 + kapiten poboljša u pet kola, uz tvoje prodajne cene (zadržavaš polovinu rasta), budžet i 3 igrača po klubu. Sa besplatnim transferom isplati se potez iznad oko 2 poena; bez njega mora da pokrije i −4.</li>
+<li><strong>Plan transfera</strong>: za svako kolo planer probava čuvanje, jedan ili dva transfera, uz 4 poena za svaki preko besplatnih (jedan novi svako kolo, najviše pet). Posle svakog kola zadržava 12 najboljih planova (beam search) i poredi najbolji sa čuvanjem transfera svako kolo. Pretpostavlja se da se cene ne menjaju.</li>
+<li><strong>AI Tim</strong>: optimizator traži najboljih 15 u okviru tvog budžeta (banka plus prodajne cene), menjajući jednog ili dva igrača odjednom dok ništa više ne poboljšava. Wildcard = najbolji tim za pet kola, Free Hit = najbolji za sledeće kolo, ocena = poeni tvog tima kao udeo poena Wildcard tima.</li>
+<li><strong>Kalendar čipova</strong>: za svaki čip koji još imaš, po kolu: Bench Boost = poeni klupe, Triple Captain = poeni kapitena još jednom, Free Hit = najbolji tim za jedno kolo minus tvojih 11. Kasnija kola pretpostavljaju da nema transfera, pa ih koristi kao smernicu.</li>
+<li><strong>Mini-liga</strong>: EO = koliko poena igrača u proseku dobija rival (kapiteni se računaju dvaput); razlika = (tvoj množilac − EO) × njegovi projektovani poeni.</li>
+</ul>`,
+        gp_data_title:      'Odakle dolaze podaci',
+        gp_data:            `<ul>
+<li><strong>Zvanični FPL API</strong> preko proksija samog sajta: odgovori se keširaju 5 minuta, poeni uživo 60 sekundi, a stranica Kolo Uživo se osvežava svakog minuta dok traju utakmice.</li>
+<li><strong>Dnevni posao u 05:30 UTC</strong>: trenutna forma za model minuta, vlasništvo najboljih 1.000 menadžera ukupno (jednom po kolu), kvote kladionica, istorija kvota i provera tačnosti.</li>
+<li><strong>Kvote kladionica</strong> sa The Odds API, jednom dnevno: oko 20 kladionica, bez marže, uprosečene i pretvorene u očekivane golove za oba tima.</li>
+<li><strong>Procena ukupnog plasmana</strong>: oko 30 strana ukupne tabele i poeni uživo 150 menadžera, osvežava se na 10 minuta.</li>
+</ul>
+<p>Red na dnu svake kartice pokazuje izvore i koliko su sveži, na primer <em>FPL podaci danas 10:42 · forma danas 05:53 · kvote danas 05:53</em>.</p>`,
+        gp_faq_title:       'Pitanja i ograničenja',
+        gp_faq:             `<h3>Moj transfer se ne vidi</h3>
+<p>FPL objavljuje transfere tek posle roka. Do tada ih dodaj u delu <strong>Transferi koje sam napravio</strong> na stranici Transferi; napomena ✎ pokazuje da su uključeni.</p>
+<h3>Zašto je moj ukupan plasman označen sa ≈?</h3>
+<p>Tokom kola uživo to je procena. Zvaničan FPL plasman je zameni kada se kolo obradi.</p>
+<h3>Zašto se brojevi menjaju tokom dana?</h3>
+<p>Svako učitavanje stranice ponovo uzima FPL podatke (keširane najviše 5 minuta), pa se menjaju vesti, cene i poeni uživo. Kvote i forma se osvežavaju svako jutro, a cene se menjaju oko ponoći po UK vremenu.</p>
+<h3>Da li se moji podaci negde čuvaju?</h3>
+<p>Samo u ovom pregledaču. Nema naloga; jedini zahtevi idu ka FPL API-ju preko proksija sajta i ka fajlovima sa podacima samog sajta.</p>
+<h3>Da li moram da platim ili se prijavim?</h3>
+<p>Ne. Besplatan je i nikad ne traži tvoju FPL lozinku.</p>
+<h3>Koliko su projekcije tačne?</h3>
+<p>To su proseci, ne sigurnost: 5 projektovanih poena lako postane 2 ili 15. Na početku sezone oslanjaju se na FPL ocene, a igrači imaju malo minuta, pa su manje pouzdane, a kasne vesti o sastavu mogu ih iznenaditi. Tačnost Modela na stranici Predikcija Poena pokazuje kako je model prošao.</p>`,
     }
 };
 
@@ -942,6 +1130,7 @@ function setLang(lang) {
     if (typeof loadLineup               === 'function')  loadLineup();
     if (typeof loadNextGW               === 'function')  loadNextGW();
     if (typeof loadLive                 === 'function')  loadLive();
+    if (typeof loadGuidePage            === 'function')  loadGuidePage();
 }
 
 // Update all elements with [data-i18n] attribute

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- PWA / Home screen icon -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <meta name="theme-color" content="#37003c">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="FPL Analyzer">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>How it works - FPL Analyzer</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="components.css">
+    <script src="theme.js"></script>
+    <script src="lang.js"></script>
+    <script src="ui.js"></script>
+    <style>
+        /* Long-form reading: comfortable line length, theme colours only */
+        .guide-page { max-width: 75ch; margin: 0 auto; color: var(--text-color); line-height: 1.6; font-size: var(--fs-md); }
+        .guide-page > p:first-child { font-size: 1.02em; }
+        .guide-page h2 { margin: var(--space-6) 0 var(--space-2); padding-top: var(--space-4); border-top: 1px solid var(--divider); font-size: var(--fs-lg); color: var(--text-color); scroll-margin-top: 72px; }
+        .guide-page h3 { margin: var(--space-4) 0 var(--space-1); font-size: var(--fs-md); color: var(--text-color); }
+        .guide-page p { margin: 0 0 var(--space-3); }
+        .guide-page ul { margin: 0 0 var(--space-3); padding-left: 1.3em; }
+        .guide-page li { margin-bottom: var(--space-2); }
+        .guide-page code { background: var(--divider); border-radius: 4px; padding: 1px 5px; font-size: 0.9em; overflow-wrap: anywhere; }
+        .guide-page a { color: var(--positive); font-weight: 700; text-decoration: none; }
+        .guide-page a:hover { text-decoration: underline; }
+        .guide-toc { border: 1.5px solid var(--border-strong); border-radius: var(--radius); padding: var(--space-3) var(--space-4); margin: var(--space-4) 0; }
+        .guide-toc ol { margin: var(--space-1) 0 0; padding-left: 1.4em; }
+        .guide-toc li { margin-bottom: var(--space-1); }
+        .guide-top { display: block; text-align: right; font-size: var(--fs-sm); margin-top: var(--space-1); }
+    </style>
+</head>
+<body class="page">
+    <div class="container">
+        <header>
+            <h1 data-i18n="gp_title">How FPL Analyzer works</h1>
+            <div class="lang-switcher">
+                <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English" aria-label="English">🇬🇧</button>
+                <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski" aria-label="Srpski">🇷🇸</button>
+            </div>
+            <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">🌙</button>
+        </header>
+
+        <div class="card">
+            <div class="card-content">
+                <article class="guide-page" id="guide-content"></article>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Sections of the guide: anchor id and lang keys gp_<key>_title / gp_<key>
+        const GUIDE_SECTIONS = ['start', 'nav', 'pages', 'model', 'decide', 'data', 'faq'];
+
+        // The whole guide from translation keys, so it follows the language switch
+        function loadGuidePage() {
+            const content = document.getElementById('guide-content');
+            const toc = `<nav class="guide-toc" aria-labelledby="guide-toc-title">
+                    <strong id="guide-toc-title">${t('gp_contents')}</strong>
+                    <ol>${GUIDE_SECTIONS.map(key => `<li><a href="#${key}">${t(`gp_${key}_title`)}</a></li>`).join('')}</ol>
+                </nav>`;
+            const sections = GUIDE_SECTIONS.map(key => `<section aria-labelledby="${key}">
+                    <h2 id="${key}">${t(`gp_${key}_title`)}</h2>
+                    ${t(`gp_${key}`)}
+                    <a class="guide-top" href="#top">↑ ${t('gp_top')}</a>
+                </section>`).join('');
+            content.innerHTML = t('gp_intro') + toc + sections;
+            document.title = `${t('gp_title')} - FPL Analyzer`;
+        }
+
+        document.addEventListener('DOMContentLoaded', loadGuidePage);
+    </script>
+
+    <footer class="site-footer" data-i18n-html="footerHtml">
+        Made with <span class="heart">&#x2665;</span> for you by <a class="footer-author" href="https://github.com/skojic" target="_blank" rel="noopener">Srdjan Kojic</a> · <a class="footer-guide" href="guide.html">How it works</a>
+    </footer>
+</body>
+</html>

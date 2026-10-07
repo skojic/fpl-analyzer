@@ -187,6 +187,8 @@
             background: rgba(0,255,135,0.1); color: #00ff87;
             padding: 1px 7px; border-radius: 4px; font-size: .82em; font-family: monospace;
         }
+        .guardian-guide { display: inline-block; margin-top: 14px; font-size: .82rem; font-weight: 700; color: rgba(0,255,135,0.72); text-decoration: none; }
+        .guardian-guide:hover, .guardian-guide:focus-visible { color: #00ff87; }
         .guardian-tip { margin: 10px 0 0; font-size: .78rem; color: rgba(255,255,255,0.3); line-height: 1.5; padding-left: 4px; }
         .guardian-lang {
             display: flex; justify-content: center; gap: 10px;
@@ -353,6 +355,7 @@
                 </ol>
                 <p class="guardian-tip" data-i18n-html="guardianTip"></p>
             </details>
+            <a class="guardian-guide" href="guide.html"><span data-i18n="guardianGuide">How does this work?</span> →</a>
             <div class="guardian-lang">
                 <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English" aria-label="English">🇬🇧</button>
                 <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski" aria-label="Srpski">🇷🇸</button>
@@ -602,7 +605,7 @@
     </script>
 
     <footer class="site-footer" data-i18n-html="footerHtml">
-        <span data-i18n="footerText">Made with</span> <span class="heart">&#x2665;</span> <span data-i18n="footerBy">for you by</span> <a class="footer-author" href="https://github.com/skojic" target="_blank" rel="noopener">Srdjan Kojic</a>
+        <span data-i18n="footerText">Made with</span> <span class="heart">&#x2665;</span> <span data-i18n="footerBy">for you by</span> <a class="footer-author" href="https://github.com/skojic" target="_blank" rel="noopener">Srdjan Kojic</a> · <a class="footer-guide" href="guide.html">How it works</a>
     </footer>
 </body>
 </html>
