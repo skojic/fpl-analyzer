@@ -4,6 +4,10 @@ name: Odds markets check
 
 on:
   workflow_dispatch:
+  # Also runs once when the check script itself changes
+  push:
+    branches: [main]
+    paths: ['scripts/check-odds-markets.js']
 
 permissions:
   contents: read

@@ -5,6 +5,14 @@
 //
 // Usage: ODDS_API_KEY=... node scripts/check-odds-markets.js
 const API = 'https://api.the-odds-api.com/v4/sports/soccer_epl';
+
+// On GitHub Actions, findings are also written as annotations: they show on the run page and can be
+// read through the public API, unlike the job log
+const ON_ACTIONS = !!process.env.GITHUB_ACTIONS;
+function report(line) {
+    console.log(line);
+    if (ON_ACTIONS) console.log(`::notice title=Odds markets check::${line.replace(/%/g, '%25').replace(/\r?\n/g, ' ')}`);
+}
 const MARKET = 'player_goal_scorer_anytime';
 
 async function get(path, key) {
@@ -34,44 +42,44 @@ async function main() {
     if (!events.ok) throw new Error(`events: HTTP ${events.status} ${events.message}`);
     const upcoming = events.data.filter(e => new Date(e.commence_time) > new Date())
         .sort((a, b) => new Date(a.commence_time) - new Date(b.commence_time));
-    console.log(`1. Upcoming Premier League matches listed: ${upcoming.length} (free call)`);
+    report(`1. Upcoming Premier League matches listed: ${upcoming.length} (free call)`);
     if (!upcoming.length) return;
     const event = upcoming[0];
-    console.log(`   Checking: ${event.home_team} v ${event.away_team}, ${event.commence_time}`);
+    report(`   Checking: ${event.home_team} v ${event.away_team}, ${event.commence_time}`);
 
     const markets = await get(`/events/${event.id}/markets?regions=us`, key);
-    console.log(`2. Markets list: HTTP ${markets.status}, cost ${markets.cost}, credits left ${markets.remaining}`);
+    report(`2. Markets list: HTTP ${markets.status}, cost ${markets.cost}, credits left ${markets.remaining}`);
     if (!markets.ok) {
-        console.log(`   ${markets.message}`);
+        report(`   ${markets.message}`);
     } else {
         for (const book of markets.data.bookmakers || []) {
             console.log(`   ${book.key}: ${book.markets.map(m => m.key).join(', ')}`);
         }
         const offered = (markets.data.bookmakers || []).filter(b => b.markets.some(m => m.key === MARKET)).map(b => b.key);
-        console.log(`   ${MARKET} offered by: ${offered.length ? offered.join(', ') : 'none listed (yet)'}`);
+        report(`   ${MARKET} offered by: ${offered.length ? offered.join(', ') : 'none listed (yet)'}`);
     }
 
     const odds = await get(`/events/${event.id}/odds?regions=us&markets=${MARKET}&oddsFormat=decimal`, key);
-    console.log(`3. ${MARKET} odds: HTTP ${odds.status}, cost ${odds.cost}, credits left ${odds.remaining}`);
+    report(`3. ${MARKET} odds: HTTP ${odds.status}, cost ${odds.cost}, credits left ${odds.remaining}`);
     if (!odds.ok) {
-        console.log(`   ${odds.message}`);
-        console.log(odds.status === 401 || odds.status === 403 || /plan|upgrade/i.test(odds.message)
+        report(`   ${odds.message}`);
+        report(odds.status === 401 || odds.status === 403 || /plan|upgrade/i.test(odds.message)
             ? 'RESULT: not available on this plan'
             : 'RESULT: request failed, see message above');
         return;
     }
     const books = (odds.data.bookmakers || []).filter(b => (b.markets || []).some(m => m.key === MARKET));
     if (!books.length) {
-        console.log('RESULT: allowed on this plan, but no bookmaker has priced this match yet; try closer to kickoff');
+        report('RESULT: allowed on this plan, but no bookmaker has priced this match yet; try closer to kickoff');
         return;
     }
     const outcomes = books[0].markets.find(m => m.key === MARKET).outcomes;
-    console.log(`   ${books.length} bookmakers; sample from ${books[0].key}:`);
-    for (const o of outcomes.slice(0, 8)) console.log(`   ${o.description || o.name}: ${o.price} (${Math.round(100 / o.price)}%)`);
-    console.log('RESULT: available on this plan');
+    report(`   ${books.length} bookmakers; sample from ${books[0].key}:`);
+    report(`   ${outcomes.slice(0, 8).map(o => `${o.description || o.name} ${o.price}`).join(', ')}`);
+    report('RESULT: available on this plan');
 }
 
 main().catch(error => {
-    console.error(error.message);
+    report(`RESULT: check failed: ${error.message}`);
     process.exit(1);
 });
