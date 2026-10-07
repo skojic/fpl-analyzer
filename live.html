@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- PWA / Home screen icon -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <meta name="theme-color" content="#37003c">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="FPL Analyzer">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Live Gameweek - FPL Analyzer</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="theme.js"></script>
+    <script src="lang.js"></script>
+    <style>
+        .container {
+            max-width: 1000px;
+        }
+        .card {
+            margin: 20px auto;
+            background: rgba(255, 255, 255, 0.98) !important;
+            border: 2px solid rgba(66, 181, 88, 0.3);
+        }
+        [data-theme="dark"] .card {
+            background: var(--bg-surface, #1a1030) !important;
+            border-color: var(--card-border, rgba(255,255,255,0.1));
+        }
+        .card-content {
+            max-height: none;
+        }
+        .lv-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 18px; }
+        @media (max-width: 768px) { .lv-grid { grid-template-columns: 1fr; } }
+        .lv-status { font-size: 0.85em; margin: 4px 0 14px; color: var(--text-muted, #666); }
+        .lv-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #e0004d; margin-right: 6px; animation: lv-pulse 1.2s infinite; }
+        @keyframes lv-pulse { 50% { opacity: 0.3; } }
+        .lv-total { font-size: 2.4em; font-weight: 900; color: var(--primary-color); }
+        [data-theme="dark"] .lv-total { color: var(--secondary-color); }
+        /* Plain table: the global table styles are built for the wide, sticky player database */
+        .lv-table { width: 100%; min-width: 0; border-collapse: collapse; font-size: 0.85em; margin: 8px 0 18px; }
+        .lv-table th, .lv-table td { position: static; white-space: nowrap; box-shadow: none; cursor: default; font-size: 1em; text-align: right; padding: 5px 8px; }
+        .lv-table th:first-child, .lv-table td:first-child { text-align: left; }
+        .lv-table td:first-child { background: transparent; color: inherit; font-weight: 600; }
+        .lv-table th { background: var(--primary-color); color: #fff; }
+        .lv-table td { border-bottom: 1px solid rgba(0,0,0,0.08); }
+        .lv-table tr.me td { background: rgba(0,255,135,0.14); font-weight: 700; }
+        .lv-table tr.bench td { opacity: 0.55; }
+        .lv-up { color: #16a34a; font-weight: 800; }
+        .lv-down { color: #e0004d; font-weight: 800; }
+        .lv-live { color: #e0004d; font-weight: 800; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <button class="back-btn" onclick="window.close()" title="Close" aria-label="Close">←</button>
+            <h1 data-i18n="cardLive">Live Gameweek</h1>
+            <div class="lang-switcher">
+                <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English">🇬🇧</button>
+                <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski">🇷🇸</button>
+            </div>
+            <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">🌙</button>
+        </header>
+
+        <div class="card">
+            <div class="card-content" id="live-content">
+                <div class="loading">Loading live points...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="fpl-api.js"></script>
+    <script src="prediction.js"></script>
+    <script src="league.js"></script>
+    <script src="live.js"></script>
+    <script>
+        const esc = text => FPL_API.escapeHtml(text);
+        let refreshTimer = null;
+
+        async function loadLive() {
+            const content = document.getElementById('live-content');
+            clearTimeout(refreshTimer);
+
+            try {
+                const [gw, leagues, allPlayers] = await Promise.all([Live.getGameweek(), League.getMyLeagues(), FPL_API.getAllPlayers()]);
+                const byId = new Map(allPlayers.map(p => [p.id, p]));
+                const mine = Live.scorePicks(await FPL_API.getEntryPicks(FPL_API.TEAM_ID, gw.gameweek), gw);
+
+                const param = parseInt(new URLSearchParams(location.search).get('id'), 10);
+                const league = leagues.find(l => l.id === param) || leagues[0];
+                const table = league ? await Live.leagueTable(league.id, gw) : [];
+
+                const status = gw.inProgress
+                    ? `<span class="lv-dot"></span>${t('lvInProgress')}`
+                    : gw.finished ? t('lvFinished') : gw.started ? t('lvBetween') : t('lvNotStarted');
+
+                let html = `<div class="lv-status">GW${gw.gameweek} · ${status} · ${t('lvUpdated')} ${new Date().toLocaleTimeString()}</div>
+                    <div class="stats-info" style="font-size:0.84em; line-height:1.6; margin-bottom:14px;">${t('lvExplain')}</div>
+                    <div class="lv-grid"><div>
+                        <h3 style="margin:0;">${t('lvYourTeam')}</h3>
+                        <div class="lv-total">${mine.points}${mine.hits ? ` <span style="font-size:0.45em;" class="lv-down">−${mine.hits}</span>` : ''}</div>
+                        <div class="lv-status">${t('leagueTotal')} ${mine.total}${mine.chip ? ` · ${mine.chip}` : ''}</div>
+                        <table class="lv-table"><tr><th>${t('colName')}</th><th>${t('lvMins')}</th><th>${t('colPoints')}</th></tr>`;
+                const ordered = mine.rows.slice().sort((a, b) => (b.multiplier > 0) - (a.multiplier > 0) || a.position - b.position);
+                for (const r of ordered) {
+                    const p = byId.get(r.element);
+                    const flags = `${r.isCaptain ? ' (C)' : ''}${r.subbedIn ? ' ↑' : ''}${r.subbedOut ? ' ↓' : ''}`;
+                    const minutes = r.playing ? `<span class="lv-live">${r.minutes}'</span>` : r.done ? `${r.minutes}'` : '–';
+                    html += `<tr class="${r.multiplier === 0 ? 'bench' : ''}"><td>${p ? p.name : r.element}${flags}</td><td>${minutes}</td>
+                        <td>${r.points * Math.max(1, r.multiplier)}${r.provisionalBonus ? ` <span title="${t('lvProvisional')}">(+${r.provisionalBonus}*)</span>` : ''}</td></tr>`;
+                }
+                html += `</table></div><div>`;
+
+                if (league) {
+                    html += `<h3 style="margin:0;">${t('lvLeague')}</h3>
+                        <label class="lv-status">${t('leagueSelect')}:
+                            <select onchange="location.search='?id='+this.value">
+                                ${leagues.map(l => `<option value="${l.id}" ${l.id === league.id ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}
+                            </select>
+                        </label>
+                        <table class="lv-table"><tr><th>${t('leagueRank')}</th><th style="text-align:left;">${t('colTeam')}</th><th>${t('leagueGW')}</th><th>${t('leagueTotal')}</th></tr>`;
+                    for (const r of table) {
+                        const move = r.startRank - r.liveRank;
+                        html += `<tr class="${r.entry === FPL_API.TEAM_ID ? 'me' : ''}">
+                            <td>${r.liveRank} ${move > 0 ? `<span class="lv-up">▲${move}</span>` : move < 0 ? `<span class="lv-down">▼${-move}</span>` : ''}</td>
+                            <td style="text-align:left;">${esc(r.team)}<br><span style="opacity:0.6; font-weight:400;">${esc(r.manager)}</span></td>
+                            <td>${r.points}${r.hits ? ` <span class="lv-down">−${r.hits}</span>` : ''}${r.chip ? ` <span style="opacity:0.6;">${r.chip}</span>` : ''}</td>
+                            <td>${r.total}</td></tr>`;
+                    }
+                    html += `</table>`;
+                }
+                html += `</div></div>`;
+                content.innerHTML = html;
+
+                // Refresh while matches are on (the proxy keeps live data for a minute)
+                if (gw.inProgress) refreshTimer = setTimeout(loadLive, 60000);
+            } catch (error) {
+                content.innerHTML = `<div class="loading">${t('errorLive')}</div>`;
+                console.error(error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadLive);
+    </script>
+
+    <footer class="site-footer" data-i18n-html="footerHtml">
+        Made with <span class="heart">&#x2665;</span> for you by <strong>Srdjan Kojic</strong>
+    </footer>
+</body>
+</html>

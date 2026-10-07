@@ -79,8 +79,7 @@
             return decimals > 0 ? num.toFixed(decimals) : Math.round(num);
         }
 
-        // Team, manager and league names are free text set by FPL users
-        const esc = text => String(text ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const esc = text => FPL_API.escapeHtml(text);
         const pct = x => `${Math.round(x * 100)}%`;
         const swing = x => `<span class="${x < 0 ? 'lg-neg' : 'lg-pos'}">${x > 0 ? '+' : ''}${safeNumber(x, 1)}</span>`;
 
@@ -110,20 +109,23 @@
                     content.innerHTML = `<div class="loading">${t('leagueNone')}</div>`;
                     return;
                 }
-                const wanted = parseInt(new URLSearchParams(location.search).get('id'), 10);
-                const leagueId = leagues.some(l => l.id === wanted) ? wanted : leagues[0].id;
+                const param = new URLSearchParams(location.search).get('id');
+                const top = await League.getTopOwnership();
+                const wanted = param === League.TOP_ID ? param : parseInt(param, 10);
+                const leagueId = leagues.some(l => l.id === wanted) || (top && wanted === League.TOP_ID) ? wanted : leagues[0].id;
                 const a = await League.analyze(leagueId);
                 const myTotal = a.me ? a.me.total : null;
 
                 let html = `<label>${t('leagueSelect')}:
                         <select class="lg-select" onchange="location.search='?id='+this.value">
                             ${leagues.map(l => `<option value="${l.id}" ${l.id === leagueId ? 'selected' : ''}>${esc(l.name)}${l.isPrivate ? '' : ` (${t('leagueTop50')})`}</option>`).join('')}
+                            ${top ? `<option value="${League.TOP_ID}" ${leagueId === League.TOP_ID ? 'selected' : ''}>${t('leagueTopOverall').replace('{n}', top.sample)}</option>` : ''}
                         </select>
                     </label>
                     <div class="lg-meta">${t('leagueBasedOn')} ${a.gameweek} · ${a.rivalsSampled} ${t('leagueSampled')}${a.hasMore ? ` · ${t('leagueTop50')}` : ''}${Object.keys(a.chips).length ? ` · ${t('leagueChips')}: ${Object.entries(a.chips).map(([c, n]) => `${c} ×${n}`).join(', ')}` : ''}</div>
                     <div class="stats-info" style="font-size:0.84em; line-height:1.6; margin-bottom:18px;">${t('leagueExplain')}</div>`;
 
-                html += `<h3>${t('leagueStandings')}</h3>
+                if (a.standings.length) html += `<h3>${t('leagueStandings')}</h3>
                     <table class="lg-table"><tr><th>${t('leagueRank')}</th><th>${t('colTeam')}</th><th>${t('leagueManager')}</th><th class="num">${t('leagueGW')}</th><th class="num">${t('leagueTotal')}</th><th class="num">${t('leagueGap')}</th></tr>
                     ${a.standings.map(r => `<tr class="${r.entry === FPL_API.TEAM_ID ? 'me' : ''}">
                         <td>${r.rank}</td><td>${esc(r.entry_name)}</td><td>${esc(r.player_name)}</td>
@@ -137,7 +139,7 @@
                     <div><h3>${t('leagueDiffs')}</h3>${playerTable(a.differentials.slice(0, 10), ['name', 'eo', 'yours', 'xPts', 'swing'])}</div>
                 </div>`;
                 html += `<div class="lg-grid">
-                    <div><h3>${t('leagueCaptains')}</h3>${playerTable(a.captains, ['name', 'captaincy', 'eo', 'yours', 'xPts'])}</div>
+                    <div><h3>${t('leagueCaptains')}</h3>${playerTable(a.captains.slice(0, 10), ['name', 'captaincy', 'eo', 'yours', 'xPts'])}</div>
                     <div><h3>${t('leagueTemplate')}</h3>${playerTable(a.template, ['name', 'owned', 'eo', 'yours'])}</div>
                 </div>`;
 

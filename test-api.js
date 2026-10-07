@@ -7,6 +7,7 @@ global.FPL_API = FPL_API; // prediction.js expects the browser global
 const Predictor = require('./prediction.js');
 global.Predictor = Predictor; // league.js expects the browser global
 const League = require('./league.js');
+const Live = require('./live.js');
 const proxy = require('./api/proxy.js');
 
 // Minimal stand-in for Vercel's request/response objects
@@ -155,6 +156,35 @@ const tests = [
             if (Math.abs(r.exposure - (r.yours - r.eo) * r.xPts) > 1e-9) throw new Error(`exposure of ${r.player.name}`);
         }
         return `${a.league.name}: ${a.rivalsSampled} rivals, EO total ${(total * 100).toFixed(0)}%`;
+    }],
+    ['Live: provisional bonus matches confirmed bonus', async () => {
+        const gw = (await FPL_API.getBootstrapStatic()).events.filter(e => e.finished).pop();
+        if (!gw) return 'no finished gameweek';
+        const [live, fixtures] = await Promise.all([FPL_API.getEventLive(gw.id), FPL_API.getEventFixtures(gw.id)]);
+        const actual = {};
+        for (const e of live.elements) for (const x of e.explain) for (const st of x.stats) if (st.identifier === 'bonus') actual[`${x.fixture}:${e.id}`] = st.value;
+        for (const f of fixtures) {
+            const computed = Live.provisionalBonus(f);
+            const keys = new Set([...Object.keys(computed).map(id => `${f.id}:${id}`), ...Object.keys(actual).filter(k => k.startsWith(`${f.id}:`))]);
+            for (const k of keys) {
+                const id = k.split(':')[1];
+                if ((computed[id] || 0) !== (actual[k] || 0)) throw new Error(`GW${gw.id} fixture ${f.id} player ${id}: ${computed[id] || 0} vs ${actual[k] || 0}`);
+            }
+        }
+        return `GW${gw.id}: ${fixtures.length} matches`;
+    }],
+    ['Live: league table matches official totals after the gameweek', async () => {
+        const gw = await Live.getGameweek();
+        if (!gw.finished) return `GW${gw.gameweek} still in progress, skipped`;
+        const leagues = await League.getMyLeagues();
+        if (!leagues.length) return 'no leagues';
+        const table = await Live.leagueTable(leagues[0].id, gw);
+        const official = new Map((await FPL_API.getLeagueStandings(leagues[0].id)).standings.results.map(r => [r.entry, r]));
+        for (const r of table) {
+            const o = official.get(r.entry);
+            if (o.total !== r.total || o.event_total !== r.points) throw new Error(`${r.team}: ${r.points}/${r.total} vs ${o.event_total}/${o.total}`);
+        }
+        return `${table.length} managers`;
     }],
     ['Model: return date parsing', async () => {
         const d = Predictor.parseReturnDate('Hamstring injury - Expected back 18 Oct');

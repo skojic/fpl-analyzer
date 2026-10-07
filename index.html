@@ -496,6 +496,26 @@
                     <div class="loading" data-i18n="opLoading">Optimizing squads...</div>
                 </div>
             </div>
+            <!-- Live Gameweek Card -->
+            <div class="card" data-card="live">
+                <div class="card-header">
+                    <h2 data-i18n="cardLive">Live Gameweek</h2>
+                    <button class="expand-btn" onclick="openCardPage('live.html')">⤢</button>
+                </div>
+                <div class="card-content" id="live-content">
+                    <div class="loading" data-i18n="loadingLive">Loading live points...</div>
+                </div>
+            </div>
+            <!-- Price Changes Card -->
+            <div class="card" data-card="prices">
+                <div class="card-header">
+                    <h2 data-i18n="cardPrices">Price Changes</h2>
+                    <button class="expand-btn" onclick="openCardPage('prices.html')">⤢</button>
+                </div>
+                <div class="card-content" id="prices-content">
+                    <div class="loading" data-i18n="loadingPrices">Loading prices...</div>
+                </div>
+            </div>
             <!-- Player Comparison Card -->
             <div class="card" data-card="comparison">
                 <div class="card-header">
@@ -536,6 +556,7 @@
     <script src="fpl-api.js"></script>
     <script src="prediction.js"></script>
     <script src="league.js"></script>
+    <script src="live.js"></script>
     <script src="app.js"></script>
 
     <!-- ═══════════════════════════════════════════════════════

@@ -32,7 +32,9 @@ async function initializeApp() {
             loadTransferSuggestions(),
             loadLeagueCard(),
             loadFixturesCard(),
-            loadOptimizerCard()
+            loadOptimizerCard(),
+            loadLiveCard(),
+            loadPricesCard()
         ]);
     } catch (error) {
         console.error('Error initializing app:', error);
@@ -724,7 +726,7 @@ async function loadLeagueCard() {
             return;
         }
         const a = await League.analyze(leagues[0].id);
-        const esc = text => String(text ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const esc = text => FPL_API.escapeHtml(text);
         const leader = a.standings[0];
         const gap = a.me && leader && leader.entry !== a.me.entry ? a.me.total - leader.total : null;
         const row = r => `
@@ -837,6 +839,64 @@ async function loadOptimizerCard() {
         content.innerHTML = html;
     } catch (error) {
         content.innerHTML = `<div class="loading">${t('errorOptimizer')}</div>`;
+        console.error(error);
+    }
+}
+
+// Load Live Gameweek Card: your live points and live position in your first league
+async function loadLiveCard() {
+    const content = document.getElementById('live-content');
+    if (!content) return;
+
+    try {
+        const [gw, leagues] = await Promise.all([Live.getGameweek(), League.getMyLeagues()]);
+        const mine = Live.scorePicks(await FPL_API.getEntryPicks(FPL_API.TEAM_ID, gw.gameweek), gw);
+        const table = leagues.length ? await Live.leagueTable(leagues[0].id, gw) : [];
+        const me = table.find(r => r.entry === FPL_API.TEAM_ID);
+        const status = gw.inProgress ? t('lvInProgress') : gw.finished ? t('lvFinished') : gw.started ? t('lvBetween') : t('lvNotStarted');
+        content.innerHTML = `<div style="font-size:0.75em; color:var(--text-muted); margin-bottom:6px;">GW${gw.gameweek} · ${status}</div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-card-value">${mine.points}${mine.hits ? ` −${mine.hits}` : ''}</div>
+                    <div class="stat-card-label">${t('lvPoints')}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-value">${me ? `${me.liveRank} / ${table.length}` : '–'}</div>
+                    <div class="stat-card-label">${leagues.length ? FPL_API.escapeHtml(leagues[0].name) : t('leagueRank')}</div>
+                </div>
+            </div>`;
+        if (gw.inProgress) setTimeout(loadLiveCard, 60000);
+    } catch (error) {
+        content.innerHTML = `<div class="loading">${t('errorLive')}</div>`;
+        console.error(error);
+    }
+}
+
+// Load Price Changes Card: your players expected to change tonight and the likeliest risers
+async function loadPricesCard() {
+    const content = document.getElementById('prices-content');
+    if (!content) return;
+
+    try {
+        const allPlayers = appData.allPlayers.length ? appData.allPlayers : await FPL_API.getAllPlayers();
+        const team = appData.myTeam.length ? appData.myTeam : (await FPL_API.getTeamComposition()).picks;
+        const byId = new Map(allPlayers.map(p => [p.id, p]));
+        const tonight = p => (p.priceChangeProjections[0] ? p.priceChangeProjections[0].percent : p.priceChangePercent);
+        const squad = team.map(p => byId.get(p.id)).filter(Boolean)
+            .sort((a, b) => Math.abs(tonight(b)) - Math.abs(tonight(a))).slice(0, 4);
+        const risers = allPlayers.filter(p => !team.some(m => m.id === p.id))
+            .sort((a, b) => tonight(b) - tonight(a)).slice(0, 3);
+        const row = p => {
+            const v = tonight(p);
+            return `<div class="player-row">
+                <div class="player-info"><div class="player-name">${p.name}</div><div class="player-meta">${p.team} • £${safeNumber(p.price, 1)}m</div></div>
+                <div class="player-stats"><div class="stat"><div class="stat-value" style="color:${v >= 0 ? '#16a34a' : '#e0004d'};">${v > 0 ? '+' : ''}${safeNumber(v, 0)}%</div><div class="stat-label">${t('pcTonight')}</div></div></div>
+            </div>`;
+        };
+        content.innerHTML = `<h4 style="margin:0 0 6px;">${t('pcYourSquad')}</h4><div class="team-grid">${squad.map(row).join('')}</div>
+            <h4 style="margin:12px 0 6px;">${t('pcRisers')}</h4><div class="team-grid">${risers.map(row).join('')}</div>`;
+    } catch (error) {
+        content.innerHTML = `<div class="loading">${t('errorPrices')}</div>`;
         console.error(error);
     }
 }

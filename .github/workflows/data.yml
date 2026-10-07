@@ -1,5 +1,6 @@
 # Daily data refresh, free on public repositories.
-# Rebuilds data/*.json from the FPL API and commits them only when they change;
+# Rebuilds data/*.json (recent form, top-manager ownership, model accuracy) from the FPL API
+# and commits them only when they change;
 # the push redeploys the site on Vercel.
 name: Data refresh
 
@@ -19,12 +20,18 @@ jobs:
   refresh:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      # Used only if the FPL API refuses direct requests from GitHub's servers
+      FPL_PROXY: https://fpl-analyzer-eosin.vercel.app/api/proxy?url=
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Recent form and top-manager ownership
+        run: node scripts/build-data.js
 
       - name: Model accuracy backtest
         run: node scripts/backtest.js

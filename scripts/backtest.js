@@ -92,12 +92,7 @@ async function main() {
             const during = (history[raw.id] || []).filter(r => r.round === g);
             if (!before.some(r => r.minutes > 0) && !during.some(r => r.minutes > 0)) continue;
 
-            const last = before.slice(-Predictor.RECENT_MATCHES);
-            Predictor.recentForm[raw.id] = last.length ? {
-                pStart: last.reduce((s, r) => s + r.starts, 0) / last.length,
-                p60: last.reduce((s, r) => s + (r.minutes >= 60 ? 1 : 0), 0) / last.length,
-                minutesPerMatch: last.reduce((s, r) => s + r.minutes, 0) / last.length
-            } : null;
+            Predictor.recentForm[raw.id] = Predictor.recentFormFromHistory(before);
 
             const player = FPL_API.formatPlayer(raw, asOf.teams, asOf.element_types);
             const projected = Predictor.projectPlayerSync(player, ctx).perGW[0] || 0;

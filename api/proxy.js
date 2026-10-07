@@ -77,8 +77,11 @@ module.exports = async (req, res) => {
             });
         }
 
-        // Cache in the browser and on Vercel's CDN, so repeat requests skip the function
-        res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300, stale-while-revalidate=600');
+        // Cache in the browser and on Vercel's CDN, so repeat requests skip the function.
+        // Live gameweek data (live points, a gameweek's fixtures) is kept for a minute only.
+        const live = /^\/api\/event\/\d+\/live\/$/.test(target.pathname) || (target.pathname === '/api/fixtures/' && target.searchParams.has('event'));
+        const ttl = live ? 60 : 300;
+        res.setHeader('Cache-Control', `public, max-age=${ttl}, s-maxage=${ttl}, stale-while-revalidate=${ttl * 2}`);
 
         return res.status(200).json(data);
 

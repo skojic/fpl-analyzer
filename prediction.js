@@ -113,6 +113,7 @@ const Predictor = {
     FORMATION: { GKP: [1, 1], DEF: [3, 5], MID: [2, 5], FWD: [1, 3] },
 
     contexts: {},           // shared fixtures / team ratings per horizon length, built once per page load
+    publishedFormLoaded: false,
     recentForm: {},         // playerId -> minutes profile from recent matches (null when unavailable)
 
     // ── Context: horizon, fixtures per team and gameweek, team strength ────
@@ -120,6 +121,7 @@ const Predictor = {
         if (this.contexts[length]) return this.contexts[length];
 
         const [bootstrap, fixtures] = await Promise.all([FPL_API.getBootstrapStatic(), FPL_API.getFixtures()]);
+        await this.loadPublishedForm(bootstrap);
         this.contexts[length] = this.buildContext(bootstrap, fixtures, null, length);
         return this.contexts[length];
     },
@@ -218,10 +220,41 @@ const Predictor = {
     },
 
     // ── Minutes model ────────────────────────────────────────────────────────
+    // Starts / 60+ minutes / minutes over a player's last few matches (element-summary history rows)
+    recentFormFromHistory(history) {
+        const last = (history || []).slice(-this.RECENT_MATCHES);
+        if (!last.length) return null;
+        const avg = fn => last.reduce((sum, r) => sum + fn(r), 0) / last.length;
+        const round = x => Math.round(x * 1000) / 1000;
+        return {
+            pStart: round(avg(r => r.starts)),
+            p60: round(avg(r => (r.minutes >= 60 ? 1 : 0))),
+            minutesPerMatch: round(avg(r => r.minutes))
+        };
+    },
+
+    // Recent form for every player, published daily by scripts/build-data.js. Used only when it was built
+    // after the latest finished gameweek, otherwise players are fetched one by one as before.
+    async loadPublishedForm(bootstrap) {
+        if (!FPL_API.IS_BROWSER || this.publishedFormLoaded) return;
+        this.publishedFormLoaded = true;
+        try {
+            const response = await fetch('data/recent-form.json', { cache: 'no-cache' });
+            if (!response.ok) return;
+            const data = await response.json();
+            const lastFinished = Math.max(0, ...bootstrap.events.filter(e => e.finished).map(e => e.id));
+            if (data.lastFinishedEvent !== lastFinished) return;
+            for (const [id, form] of Object.entries(data.players)) {
+                if (!(id in this.recentForm)) this.recentForm[id] = form;
+            }
+        } catch (error) {
+            console.error('Published recent form unavailable:', error.message);
+        }
+    },
+
     // Fetch the last few matches for these players (element-summary) to see current starts / minutes.
     async loadRecentHistory(players) {
         const queue = players.filter(p => !(p.id in this.recentForm));
-        const avg = (rows, fn) => rows.reduce((sum, r) => sum + fn(r), 0) / rows.length;
 
         const worker = async () => {
             while (queue.length) {
@@ -229,14 +262,7 @@ const Predictor = {
                 this.recentForm[player.id] = null;
                 try {
                     const details = await FPL_API.getPlayerDetails(player.id);
-                    const last = (details.history || []).slice(-this.RECENT_MATCHES);
-                    if (last.length) {
-                        this.recentForm[player.id] = {
-                            pStart: avg(last, r => r.starts),
-                            p60: avg(last, r => (r.minutes >= 60 ? 1 : 0)),
-                            minutesPerMatch: avg(last, r => r.minutes)
-                        };
-                    }
+                    this.recentForm[player.id] = this.recentFormFromHistory(details.history);
                 } catch (error) {
                     console.error(`Recent history unavailable for ${player.name}:`, error.message);
                 }

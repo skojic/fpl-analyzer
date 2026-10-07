@@ -5,6 +5,9 @@ const FPL_API = {
     MAX_RETRIES: 2,
     RETRY_DELAY: 1000, // ms
     IS_BROWSER: typeof window !== 'undefined',
+    // Node only: proxy to fall back to when the FPL API refuses direct requests (e.g. from CI servers),
+    // set with FPL_PROXY=https://<site>/api/proxy?url=
+    NODE_PROXY: typeof window === 'undefined' && typeof process !== 'undefined' ? process.env.FPL_PROXY || null : null,
 
     // Cached data
     cache: {
@@ -31,9 +34,11 @@ const FPL_API = {
 
         for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
             let retryable = true;
+            // In Node, retries after a failed direct request go through NODE_PROXY when it is set
+            const viaNodeProxy = this.NODE_PROXY && attempt > 0;
             try {
-                const url = this.buildUrl(endpoint);
-                console.log(`Attempt ${attempt + 1}: Fetching ${this.IS_BROWSER ? 'via proxy' : 'direct API'}`);
+                const url = viaNodeProxy ? this.NODE_PROXY + encodeURIComponent(endpoint) : this.buildUrl(endpoint);
+                console.log(`Attempt ${attempt + 1}: Fetching ${this.IS_BROWSER || viaNodeProxy ? 'via proxy' : 'direct API'}`);
 
                 let response;
                 try {
@@ -60,7 +65,8 @@ const FPL_API = {
                 lastError = error;
                 console.error(`❌ Attempt ${attempt + 1} failed:`, error.message);
 
-                if (!retryable) break;
+                // A refused direct request is still worth one try through the Node proxy
+                if (!retryable && !(this.NODE_PROXY && attempt === 0)) break;
 
                 // If this is not the last attempt, retry with delay
                 if (attempt < this.MAX_RETRIES) {
@@ -71,6 +77,11 @@ const FPL_API = {
         }
 
         throw lastError;
+    },
+
+    // Team, manager and league names are free text set by FPL users: escape before putting them in HTML
+    escapeHtml(text) {
+        return String(text ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     },
 
     // Transfer planner preferences (locked / banned player ids), saved per team in the browser
@@ -158,14 +169,35 @@ const FPL_API = {
         }
     },
 
-    // Classic league standings (first page: up to 50 managers)
-    async getLeagueStandings(leagueId) {
-        if (this.cache.leagues[leagueId]) return this.cache.leagues[leagueId];
+    // Live points for a gameweek (not cached: refreshed while matches are on)
+    async getEventLive(gameweek) {
+        try {
+            return await this.fetchWithRetry(`${this.BASE_URL}/event/${gameweek}/live/`);
+        } catch (error) {
+            console.error('Error fetching live points:', error);
+            throw new Error(`Failed to load live points: ${error.message}`);
+        }
+    },
+
+    // One gameweek's fixtures with live scores and bonus point system (BPS) values (not cached)
+    async getEventFixtures(gameweek) {
+        try {
+            return await this.fetchWithRetry(`${this.BASE_URL}/fixtures/?event=${gameweek}`);
+        } catch (error) {
+            console.error('Error fetching gameweek fixtures:', error);
+            throw new Error(`Failed to load fixtures for gameweek ${gameweek}: ${error.message}`);
+        }
+    },
+
+    // Classic league standings, 50 managers per page
+    async getLeagueStandings(leagueId, page = 1) {
+        const key = `${leagueId}:${page}`;
+        if (this.cache.leagues[key]) return this.cache.leagues[key];
 
         try {
-            const url = `${this.BASE_URL}/leagues-classic/${leagueId}/standings/`;
+            const url = `${this.BASE_URL}/leagues-classic/${leagueId}/standings/${page > 1 ? `?page_standings=${page}` : ''}`;
             const data = await this.fetchWithRetry(url);
-            this.cache.leagues[leagueId] = data;
+            this.cache.leagues[key] = data;
             return data;
         } catch (error) {
             console.error('Error fetching league:', error);
@@ -308,6 +340,9 @@ const FPL_API = {
             costChangeEventFall: player.cost_change_event_fall,
             costChangeStart: player.cost_change_start,
             costChangeStartFall: player.cost_change_start_fall,
+            // FPL's price predictor: progress towards the next change (±100% = change), now and for the next nights
+            priceChangePercent: parseFloat(player.price_change_percent) || 0,
+            priceChangeProjections: (player.price_change_projections || []).map(p => ({ offset: p.offset, percent: parseFloat(p.projected_percent) || 0 })),
             valueForm: parseFloat(player.value_form),
             valueSeason: parseFloat(player.value_season),
 
