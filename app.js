@@ -174,6 +174,10 @@ async function loadMyTeam() {
 // Helper function to render a player on the field
 function renderFieldPlayer(player) {
     const captainClass = player.isCaptain ? 'captain' : (player.isViceCaptain ? 'vice-captain' : '');
+    const avail = FPL_API.getAvailability(player);
+    const flagHtml = avail
+        ? `<div class="player-flag player-flag-${avail.level}" title="${(avail.news || '').replace(/"/g, '&quot;')}">${avail.isKey ? t(avail.label) : avail.label}</div>`
+        : '';
     const points = player.eventPoints || 0;
     const isGK = player.position === 'GKP';
     const kitSuffix = isGK ? '_1' : '';
@@ -187,17 +191,18 @@ function renderFieldPlayer(player) {
     const fixList = (appData.fixtureMap && appData.fixtureMap[player.teamId]) || [];
     const fixHtml = fixList.map(f => {
         const haClass = f.isHome ? 'fp-ha-home' : 'fp-ha-away';
-        const badgeUrl = f.oppCode ? `https://resources.premierleague.com/premierleague/badges/t${f.oppCode}.png` : '';
+        const badgeUrl = f.oppCode ? `https://resources.premierleague.com/premierleague/badges/50/t${f.oppCode}.png` : '';
         const badgeImg = badgeUrl ? `<img class="fp-badge" src="${badgeUrl}" onerror="this.style.display='none'">` : '';
-        return `<span class="fp-fix fp-fdr-${f.diff} ${haClass}" title="${f.isHome ? 'Home' : 'Away'} vs ${f.opp}">${badgeImg}<span class="fp-ha"><span class="fp-ha-full">${f.isHome ? 'Home' : 'Away'}</span><span class="fp-ha-abbr">${f.isHome ? 'H' : 'A'}</span></span></span>`;
+        return `<span class="fp-fix fp-fdr-${f.diff} ${haClass}" title="${f.isHome ? 'Home' : 'Away'} vs ${f.opp}">${badgeImg}<span class="fp-opp">${f.opp}</span><span class="fp-ha">${f.isHome ? 'H' : 'A'}</span></span>`;
     }).join('');
 
     return `
         <div class="field-player player-clickable" onclick="window.open('player.html?id=${player.id}','_blank')" title="View ${player.name} profile">
-            <div class="player-shirt-box">
+            <div class="player-shirt-box${avail ? ` flag-${avail.level}` : ''}">
                 <div class="player-shirt ${captainClass}">${kitImg}</div>
                 <div class="player-name-field">${player.name}</div>
                 <div class="player-points-field">${points} pts</div>
+                ${flagHtml}
             </div>
             <div class="player-fixtures-row">${fixHtml}</div>
         </div>

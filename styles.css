@@ -371,17 +371,17 @@ header h1 {
 }
 
 .card-content .player-shirt-box {
-    padding: 4px 7px;
+    padding: 3px 5px 2px;
 }
 
 .card-content .player-shirt {
-    width: 38px;
-    height: 38px;
+    width: 30px;
+    height: 30px;
 }
 
 .card-content .player-kit-img {
-    width: 38px;
-    height: 38px;
+    width: 30px;
+    height: 30px;
 }
 
 .card-content .stats-grid {
@@ -901,11 +901,11 @@ tbody tr.row-form-poor td:first-child {
 .player-shirt-box {
     background: rgba(80, 0, 92, 0.65);
     border-radius: 10px;
-    padding: 6px 9px 5px;
+    padding: 4px 6px 3px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 2px;
+    gap: 1px;
     width: 100%;
     box-shadow:
         0 4px 14px rgba(55, 0, 62, 0.45),
@@ -913,10 +913,33 @@ tbody tr.row-form-poor td:first-child {
     border: 1px solid rgba(255, 255, 255, 0.10);
 }
 
+/* ── Availability flag (doubtful / injured / suspended), FPL site colours ── */
+.player-flag {
+    align-self: stretch;
+    margin-top: 2px;
+    padding: 1px 3px;
+    border-radius: 4px;
+    font-size: 0.62em;
+    font-weight: 800;
+    line-height: 1.4;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.player-flag-doubt { background: #ffe65b; color: #37003c; }
+.player-flag-risk  { background: #ff9f43; color: #37003c; }
+.player-flag-out   { background: #e0004d; color: #fff; }
+
+.player-shirt-box.flag-doubt { border-color: #ffe65b; }
+.player-shirt-box.flag-risk  { border-color: #ff9f43; }
+.player-shirt-box.flag-out   { border-color: #e0004d; }
+
 /* ── Player shirt: transparent wrapper for kit image ── */
 .player-shirt {
-    width: 46px;
-    height: 46px;
+    width: 36px;
+    height: 36px;
     position: relative;
     display: flex;
     align-items: center;
@@ -927,8 +950,8 @@ tbody tr.row-form-poor td:first-child {
 
 /* Actual kit image */
 .player-kit-img {
-    width: 46px;
-    height: 46px;
+    width: 36px;
+    height: 36px;
     object-fit: contain;
     display: block;
     filter: drop-shadow(0 2px 5px rgba(0,0,0,0.55));
@@ -1021,11 +1044,11 @@ tbody tr.row-form-poor td:first-child {
     justify-content: center;
     gap: 3px;
     border-radius: 20px;
-    font-size: 0.49em;
+    font-size: 0.6em;
     font-weight: 800;
     white-space: nowrap;
     line-height: 1;
-    padding: 3px 7px 3px 4px;
+    padding: 2px 6px 2px 2px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.45);
     background: rgba(70,70,80,0.85);
     width: 100%;
@@ -1044,8 +1067,8 @@ tbody tr.row-form-poor td:first-child {
 .fp-ha-away.fp-fdr-5 { background: rgba(130, 0, 0, 0.95); }
 /* Club badge circle */
 .fp-badge {
-    width: 11px;
-    height: 11px;
+    width: 20px;
+    height: 20px;
     border-radius: 50%;
     object-fit: contain;
     background: rgba(255,255,255,0.95);
@@ -1053,15 +1076,20 @@ tbody tr.row-form-poor td:first-child {
     flex-shrink: 0;
     display: block;
 }
-/* H / A label */
-.fp-ha {
+/* Opponent short name + H / A label */
+.fp-opp {
     color: #fff;
     font-weight: 900;
-    font-size: 1em;
     letter-spacing: 0.02em;
 }
-.fp-ha-abbr { display: none; }
-.fp-ha-full { display: inline; text-transform: uppercase; }
+.fp-ha {
+    color: rgba(255,255,255,0.75);
+    font-weight: 800;
+}
+.card-content .fp-badge {
+    width: 18px;
+    height: 18px;
+}
 .row-clickable {
     cursor: pointer;
 }
@@ -1422,23 +1450,23 @@ tbody tr.row-form-poor td:first-child {
 
     /* Smaller jerseys on tablet */
     .player-shirt {
-        width: 45px;
-        height: 45px;
+        width: 34px;
+        height: 34px;
     }
 
     .player-kit-img {
-        width: 45px;
-        height: 45px;
+        width: 34px;
+        height: 34px;
     }
 
     .card-content .player-shirt {
-        width: 38px;
-        height: 38px;
+        width: 28px;
+        height: 28px;
     }
 
     .card-content .player-kit-img {
-        width: 38px;
-        height: 38px;
+        width: 28px;
+        height: 28px;
     }
 
     .field-player {
@@ -1450,11 +1478,11 @@ tbody tr.row-form-poor td:first-child {
     }
 
     .player-shirt-box {
-        padding: 5px 8px;
+        padding: 3px 5px 2px;
     }
 
     .card-content .player-shirt-box {
-        padding: 4px 6px;
+        padding: 3px 4px 2px;
     }
 
     .field-line {
@@ -1564,19 +1592,19 @@ tbody tr.row-form-poor td:first-child {
     }
 
     .player-shirt {
-        width: 30px;
-        height: 30px;
+        width: 24px;
+        height: 24px;
     }
 
     .player-kit-img {
-        width: 30px;
-        height: 30px;
+        width: 24px;
+        height: 24px;
     }
 
     .card-content .player-shirt,
     .card-content .player-kit-img {
-        width: 26px;
-        height: 26px;
+        width: 22px;
+        height: 22px;
     }
 
     /* Scale down the C / V badge */
@@ -1597,7 +1625,7 @@ tbody tr.row-form-poor td:first-child {
 
     /* Card mobile sizing */
     .player-shirt-box {
-        padding: 4px 6px;
+        padding: 2px 3px;
     }
 
     .player-name-field {
@@ -1608,7 +1636,7 @@ tbody tr.row-form-poor td:first-child {
         font-size: 0.50em;
     }
 
-    /* Fixture chips on mobile: hide badge, just coloured H/A letter */
+    /* Fixture chips on mobile: badge + opponent, H/A shown by chip shade */
     .player-club-badge {
         display: none;
     }
@@ -1618,23 +1646,19 @@ tbody tr.row-form-poor td:first-child {
     }
 
     .fp-fix {
-        font-size: 0.43em;
-        padding: 2px 6px 2px 3px;
+        font-size: 0.5em;
+        padding: 1px 4px 1px 1px;
         gap: 2px;
         border-radius: 20px;
     }
 
-    .fp-badge {
-        width: 10px;
-        height: 10px;
+    .fp-badge,
+    .card-content .fp-badge {
+        width: 15px;
+        height: 15px;
     }
 
-    .fp-ha-full { display: none; }
-    .fp-ha-abbr { display: inline; }
-
-    .fp-ha {
-        font-size: 1em;
-    }
+    .fp-ha { display: none; }
 
     .stats-grid {
         grid-template-columns: 1fr;

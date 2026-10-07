@@ -251,6 +251,24 @@ const FPL_API = {
         };
     },
 
+    // Availability flag shown on the pitch, mirroring the FPL site colours:
+    // 75% yellow, 50/25% orange, 0% or injured/suspended/unavailable red. null when fully available.
+    getAvailability(player) {
+        const chance = player.chanceOfPlayingNextRound;
+        if (player.status === 'a' && (chance === null || chance === undefined || chance === 100)) return null;
+        let level = 'out';
+        if (chance >= 75) level = 'doubt';
+        else if (chance > 0) level = 'risk';
+        else if (player.status === 'd') level = 'doubt';  // doubtful without a percentage
+        const labelKey = { i: 'flagInjured', s: 'flagSuspended', u: 'flagUnavailable', d: 'flagDoubtful' }[player.status];
+        return {
+            level,
+            label: chance > 0 ? `${chance}%` : labelKey,
+            isKey: !(chance > 0),
+            news: player.news || ''
+        };
+    },
+
     // Get all players formatted
     async getAllPlayers() {
         const bootstrap = await this.getBootstrapStatic();

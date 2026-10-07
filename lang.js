@@ -43,6 +43,10 @@ const TRANSLATIONS = {
         /* ── My Team / pitch ── */
         gameweek:           'Gameweek',
         substitutes:        'Substitutes',
+        flagInjured:        'Injured',
+        flagSuspended:      'Suspended',
+        flagUnavailable:    'Unavailable',
+        flagDoubtful:       'Doubtful',
         gwPoints:           'GW Points',
         bank:               'Bank',
         teamValue:          'Team Value',
@@ -249,6 +253,10 @@ const TRANSLATIONS = {
         /* ── My Team / pitch ── */
         gameweek:           'Kolo',
         substitutes:        'Rezervni',
+        flagInjured:        'Povređen',
+        flagSuspended:      'Suspendovan',
+        flagUnavailable:    'Nedostupan',
+        flagDoubtful:       'Neizvestan',
         gwPoints:           'Poeni Kola',
         bank:               'Budžet',
         teamValue:          'Vrednost Tima',
