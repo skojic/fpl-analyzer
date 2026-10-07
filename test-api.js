@@ -49,14 +49,40 @@ const tests = [
             }
         }
     }],
-    ['Model: unavailable players project 0 points', async () => {
+    ['Model: unavailable players project 0 for the next gameweek', async () => {
         const players = await FPL_API.getAllPlayers();
         const out = players.filter(p => p.chanceOfPlayingNextRound === 0 && p.minutes > 0).slice(0, 5);
         for (const p of out) {
-            const pts = await Predictor.calculatePlayerNext5GWPoints(p);
-            if (pts !== 0) throw new Error(`${p.name} (${p.status}, 0%) projects ${pts}`);
+            const { perGW } = await Predictor.projectPlayer(p);
+            if (perGW[0] !== 0) throw new Error(`${p.name} (${p.status}, 0%) projects ${perGW[0]}`);
         }
         return `${out.length} checked`;
+    }],
+    ['Model: transfer plan respects budget, club limit and formation', async () => {
+        const team = await FPL_API.getTeamComposition();
+        const players = await FPL_API.getAllPlayers();
+        const plan = await Predictor.getTransferPlan(team.picks, players, team.entryHistory.bank / 10);
+        const ctx = await Predictor.getContext();
+        for (const tr of plan.transfers) {
+            if (tr.in.price > plan.bank + tr.out.sellingPrice + 1e-9) throw new Error(`${tr.in.name} over budget`);
+            const squad = plan.squad.map(p => (p.id === tr.out.id ? tr.in : p));
+            const perClub = {};
+            for (const p of squad) perClub[p.teamId] = (perClub[p.teamId] || 0) + 1;
+            if (Math.max(...Object.values(perClub)) > 3) throw new Error(`${tr.in.name} breaks the 3-per-club limit`);
+            if (tr.in.position !== tr.out.position) throw new Error('position mismatch');
+        }
+        const lineup = Predictor.bestLineup(plan.squad.map(p => Predictor.projectPlayerSync(p, ctx)), 0);
+        const count = pos => lineup.xi.filter(pr => pr.player.position === pos).length;
+        if (lineup.xi.length !== 11 || count('GKP') !== 1 || count('DEF') < 3 || count('MID') < 2 || count('FWD') < 1) {
+            throw new Error('invalid XI');
+        }
+        if (!(plan.freeTransfers >= 0 && plan.freeTransfers <= plan.maxFree)) throw new Error(`free transfers ${plan.freeTransfers}`);
+        return `${plan.transfers.length} options, ${plan.freeTransfers} FT, XI ${lineup.points.toFixed(1)} pts`;
+    }],
+    ['Model: return date parsing', async () => {
+        const d = Predictor.parseReturnDate('Hamstring injury - Expected back 18 Oct');
+        if (!d || d.getUTCDate() !== 18 || d.getUTCMonth() !== 9) throw new Error(`got ${d}`);
+        if (Predictor.parseReturnDate('Knock - 75% chance of playing') !== null) throw new Error('false match');
     }],
     ['Model: probability helpers', async () => {
         const close = (a, b) => Math.abs(a - b) < 1e-3;

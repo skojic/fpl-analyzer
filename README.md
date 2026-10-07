@@ -43,20 +43,11 @@ Link to the APP: https://fpl-analyzer-eosin.vercel.app/
 - Detailed fixture-by-fixture breakdown for top players
 
 ### 🔄 Transfer Suggestions
-- **Always provides at least 3 transfer suggestions** regardless of team quality
-- Enhanced AI algorithm using comprehensive player scoring:
-  - **Extended statistics**: xG per 90, xA per 90, xGI per 90
-  - **Performance metrics**: Form, PPG, BPS, ICT Index
-  - **Playing time**: Minutes, starts, rotation risk analysis
-  - **Set pieces**: Penalty taker order, free kick taker
-  - **Bonus potential**: BPS per game analysis
-- Smart transfer recommendations based on:
-  - Multi-factor player comprehensive score
-  - Fixture difficulty for next 5 gameweeks
-  - Expected points following official FPL scoring rules
-  - Budget constraints with flexible allowances
-- Detailed transfer reasons with specific metrics
-- Fixture comparison between incoming and outgoing players
+- Every single transfer is scored by how much it improves your **best XI plus captain** over the next 5 gameweeks, so swapping a bench player only counts if the new player would start
+- Uses your real **selling prices** (half of any price rise), bank, the **3-per-club limit** and transfers already made for the next deadline
+- Shows your **free transfers** and a verdict per option: *Make it*, *Worth a −4* or *Marginal: consider rolling*
+- Reasons based on the projection: availability, minutes, blank and double gameweeks, projected points
+- Fixture-by-fixture projected points for the outgoing and incoming player
 - "Players to Watch" section by position
 - Value score calculations (points per million)
 
@@ -224,25 +215,20 @@ The prediction algorithm follows official FPL scoring (2026/27, as returned by t
 
 ## Prediction Algorithm
 
-The enhanced points prediction system uses:
+Code: `prediction.js`. Projections cover the next 5 gameweeks from the next deadline; a blank gameweek scores 0 and a double gameweek counts both matches.
 
-1. **Expected Stats per 90**: xG/90, xA/90 for more accurate projections
-2. **Player Form**: Recent performance (last 5 games) weighted heavily
-3. **Fixture Difficulty**: Adjusts expectations based on opponent strength
-4. **Historical Statistics**: Goals, assists, clean sheets, bonus points, saves
-5. **Bonus Potential**: BPS per game to estimate bonus point probability
-6. **Playing Time Analysis**: Start probability based on minutes and starts data
-7. **Rotation Risk**: Calculated from starts percentage and consecutive games
-8. **Set Piece Role**: Penalty taker order for additional expected points
-9. **Availability**: Injury concerns and chance of playing percentage
-10. **Position-Specific Factors**: Different calculations for GKP/DEF/MID/FWD
-
-### Difficulty Multipliers
-- Difficulty 1 (Easiest): +30% for attackers, -30% for clean sheets
-- Difficulty 2: +15% for attackers, -15% for clean sheets
-- Difficulty 3 (Medium): No adjustment
-- Difficulty 4: -15% for attackers, +15% for clean sheets
-- Difficulty 5 (Hardest): -30% for attackers, +30% for clean sheets
+1. **Minutes**: chance of starting, of a substitute appearance and of 60+ minutes, from starts and minutes per team match this season blended with the last 5 matches (60% weight on recent matches)
+2. **Availability**: FPL's chance of playing for the next gameweek; later gameweeks use the return date in the injury news ("Expected back 18 Oct"), otherwise a gradual return. Players who left the club score 0
+3. **Team strength**: each club's xG for and against per 90 this season, relative to the league average, blended with FPL's own 1–5 strength rating while the sample is small (6 matches of prior). Home advantage ±10%
+4. **Per-90 rates**: xG, xA, saves, defensive actions, bonus and yellow cards per 90, steadied with 270 minutes of position-average data so players with few minutes don't get extreme rates
+5. **Points per match** (2026/27 scoring):
+   - Appearance: 2 points for 60+ minutes, 1 for less
+   - Goals and assists: per-90 rate × opponent defence × home/away × expected minutes
+   - Clean sheet: P(60+ minutes) × e^−(goals his team is expected to concede)
+   - Goals conceded (GKP/DEF): −1 per 2, saves (GKP): 1 per 3, both as Poisson expectations
+   - Defensive contribution: 2 points × P(reaching 10 actions for DEF, 12 for MID/FWD)
+   - Bonus from his own bonus rate, yellow cards −1
+6. **Squad value**: best valid XI (1 GKP, 3–5 DEF, 2–5 MID, 1–3 FWD) plus captain for each gameweek, with each gameweek weighted 0.9× the one before
 
 ## Browser Compatibility
 

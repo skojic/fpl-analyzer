@@ -11,7 +11,9 @@ const FPL_API = {
         bootstrap: null,
         teamData: null,
         fixtures: null,
-        managerHistory: null
+        managerHistory: null,
+        entryTransfers: null,
+        playerDetails: {}
     },
 
     // Helper to build URL - uses the same-origin Vercel proxy (api/proxy.js) in browser, direct in Node.js
@@ -141,11 +143,29 @@ const FPL_API = {
         }
     },
 
-    // Fetch player detailed data
+    // Fetch the manager's transfer history (all gameweeks, newest first)
+    async getEntryTransfers() {
+        if (this.cache.entryTransfers) return this.cache.entryTransfers;
+
+        try {
+            const url = `${this.BASE_URL}/entry/${this.TEAM_ID}/transfers/`;
+            const data = await this.fetchWithRetry(url);
+            this.cache.entryTransfers = data;
+            return data;
+        } catch (error) {
+            console.error('Error fetching transfers:', error);
+            throw new Error(`Failed to load your transfer history: ${error.message}`);
+        }
+    },
+
+    // Fetch player detailed data (match history, upcoming fixtures)
     async getPlayerDetails(playerId) {
+        if (this.cache.playerDetails[playerId]) return this.cache.playerDetails[playerId];
+
         try {
             const url = `${this.BASE_URL}/element-summary/${playerId}/`;
             const data = await this.fetchWithRetry(url);
+            this.cache.playerDetails[playerId] = data;
             return data;
         } catch (error) {
             console.error('Error fetching player details:', error);

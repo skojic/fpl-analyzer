@@ -93,11 +93,15 @@
             try {
                 const teamData = await FPL_API.getTeamComposition();
                 const allPlayers = await FPL_API.getAllPlayers();
-                const budget = teamData.entryHistory ? teamData.entryHistory.bank / 10 : 0;
+                const bank = teamData.entryHistory ? teamData.entryHistory.bank / 10 : 0;
 
                 content.innerHTML = `<div class="loading">${t('loadingTransfers')}</div>`;
 
-                const transfers = await Predictor.findBestTransfers(teamData.picks, allPlayers, budget);
+                const plan = await Predictor.getTransferPlan(teamData.picks, allPlayers, bank);
+                const transfers = plan.transfers;
+                const budget = plan.bank;
+                const horizon = plan.horizon.length ? `GW${plan.horizon[0].id}–${plan.horizon[plan.horizon.length - 1].id}` : '';
+                const verdictLabels = { make: t('verdictMake'), hit: t('verdictHit'), marginal: t('verdictMarginal') };
 
                 // Group transfers by position
                 const gkpTransfers = transfers.filter(tr => tr.position === 'GKP');
@@ -118,8 +122,8 @@
                             <div class="stat-card-label">${t('budgetAvail')}</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-card-value">${teamData.entryHistory?.event_transfers || 0}</div>
-                            <div class="stat-card-label">${t('transfersGW')}</div>
+                            <div class="stat-card-value">${plan.freeTransfers}</div>
+                            <div class="stat-card-label">${t('freeTransfers')}</div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-card-value">${gkpTransfers.length}</div>
@@ -162,22 +166,23 @@
                         for (let i = 0; i < group.transfers.length; i++) {
                             const transfer = group.transfers[i];
 
-                            // Get fixture details for both players
-                            const outFixtures = await FPL_API.getPlayerFixtureDifficulty(transfer.out.id);
-                            const inFixtures = await FPL_API.getPlayerFixtureDifficulty(transfer.in.id);
+                            // Fixtures over the horizon with projected points
+                            const outFixtures = transfer.outProjection.fixtures;
+                            const inFixtures = transfer.inProjection.fixtures;
 
                             html += `
                                 <div class="transfer-item" style="margin-bottom: 20px; border: 2px solid ${group.color}20; border-radius: 12px;">
                                     <div class="transfer-header" style="background: linear-gradient(135deg, ${group.color}15 0%, ${group.color}05 100%); border-bottom: 2px solid ${group.color}30;">
                                         <strong style="color: ${group.color}; font-size: 1.1em;">${t('option')} ${i + 1}</strong>
-                                        <span class="expected-points" style="background: ${group.color}; color: white; padding: 6px 14px; border-radius: 20px; font-weight: bold;">+${safeNumber(transfer.expectedPointsGain, 1)} pts (Next 5 GWs)</span>
+                                        <span style="margin-left: auto; margin-right: 10px; font-size: 0.9em; color: var(--text-muted, #666);">${verdictLabels[transfer.verdict] || ''}</span>
+                                        <span class="expected-points" style="background: ${transfer.verdict === 'marginal' ? '#9ca3af' : group.color}; color: white; padding: 6px 14px; border-radius: 20px; font-weight: bold;">+${safeNumber(transfer.expectedPointsGain, 1)} pts (${horizon})</span>
                                     </div>
 
                                 <div class="transfer-players">
                                     <div class="transfer-out" style="flex: 1;">
                                         <div><strong style="color: #ff2882;">OUT:</strong> ${transfer.out.name}</div>
                                         <div style="font-size: 0.9em; color: var(--text-muted, #666); margin-top: 5px;">
-                                            ${transfer.out.team} • ${transfer.out.position} • £${safeNumber(transfer.out.price, 1)}m
+                                            ${transfer.out.team} • ${transfer.out.position} • £${safeNumber(transfer.out.price, 1)}m (${t('sellPrice')} £${safeNumber(transfer.out.sellingPrice, 1)}m)
                                         </div>
                                         <div style="font-size: 0.85em; margin-top: 5px;">
                                             ${group.isGKP
@@ -211,7 +216,7 @@
                                 </div>
 
                                 <div style="margin-top: 15px;">
-                                    <h5 style="margin-bottom: 8px;">${t('next3Fixtures')}</h5>
+                                    <h5 style="margin-bottom: 8px;">${t('fixturesXPts')}</h5>
                                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                                         <div>
                                             <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 5px; color: #ff2882;">
@@ -219,14 +224,14 @@
                                             </div>
                         `;
 
-                        for (let j = 0; j < Math.min(3, outFixtures.length); j++) {
-                            const f = outFixtures[j];
+                        for (const f of outFixtures) {
                             html += `
                                 <div style="font-size: 0.8em; padding: 3px 0;">
-                                    ${f.isHome ? 'vs' : '@'} ${f.opponent}
+                                    GW${f.event} ${f.isHome ? 'vs' : '@'} ${f.opponent}
                                     <span class="fixture-difficulty difficulty-${f.difficulty}" style="padding: 2px 6px; font-size: 0.9em;">
                                         ${f.difficulty}
                                     </span>
+                                    <strong>${safeNumber(f.expectedPoints, 1)}</strong>
                                 </div>
                             `;
                         }
@@ -239,14 +244,14 @@
                                             </div>
                         `;
 
-                        for (let j = 0; j < Math.min(3, inFixtures.length); j++) {
-                            const f = inFixtures[j];
+                        for (const f of inFixtures) {
                             html += `
                                 <div style="font-size: 0.8em; padding: 3px 0;">
-                                    ${f.isHome ? 'vs' : '@'} ${f.opponent}
+                                    GW${f.event} ${f.isHome ? 'vs' : '@'} ${f.opponent}
                                     <span class="fixture-difficulty difficulty-${f.difficulty}" style="padding: 2px 6px; font-size: 0.9em;">
                                         ${f.difficulty}
                                     </span>
+                                    <strong>${safeNumber(f.expectedPoints, 1)}</strong>
                                 </div>
                             `;
                         }

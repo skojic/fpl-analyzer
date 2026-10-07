@@ -100,227 +100,315 @@ const Predictor = {
         return Math.max(0, 1 - below);
     },
 
-    // Calculate expected points for next fixture based on stats and FPL rules
-    calculateExpectedPoints(player, fixture) {
-        let expectedPoints = 0;
+    // ── Model settings ───────────────────────────────────────────────────────
+    HORIZON: 5,             // gameweeks projected, starting with the next deadline
+    DECAY: 0.9,             // weight of each gameweek relative to the one before (nearer counts more)
+    HIT_COST: 4,            // points per transfer beyond the free ones
+    HOME_ADVANTAGE: 1.1,    // goal multiplier at home (away = 1 / this)
+    PRIOR_GAMES: 6,         // team ratings: weight (in matches) of FPL's strength rating vs this season's xG
+    PRIOR_MINUTES: 270,     // player rates: minutes of position-average data blended into per-90 stats
+    RECENT_MATCHES: 5,      // matches of element-summary history used for the minutes model
+    START_MINUTES: 85,      // typical minutes for a starter
+    SUB_MINUTES: 20,        // typical minutes for a substitute appearance
+    FORMATION: { GKP: [1, 1], DEF: [3, 5], MID: [2, 5], FWD: [1, 3] },
 
-        // Safe value getter with defaults
-        const safeValue = (value, defaultVal = 0) => {
-            const num = parseFloat(value);
-            return isNaN(num) ? defaultVal : num;
-        };
+    context: null,          // shared fixtures / team ratings, built once per page load
+    recentForm: {},         // playerId -> minutes profile from recent matches (null when unavailable)
 
-        // Base points for playing (assume based on starts and minutes)
-        const minutes = safeValue(player.minutes, 0);
-        const starts = safeValue(player.starts, 0);
-        const gamesPlayed = minutes > 0 ? minutes / 90 : 1;
-        const startProbability = gamesPlayed > 0 ? Math.min(starts / gamesPlayed, 1) : 0.7;
+    // ── Context: horizon, fixtures per team and gameweek, team strength ────
+    async getContext() {
+        if (this.context) return this.context;
 
-        // Playing chance. Everything below is points *if he plays*; it is scaled by this once at the end.
-        const playingChance = this.getAvailability(player) * startProbability;
+        const [bootstrap, fixtures] = await Promise.all([FPL_API.getBootstrapStatic(), FPL_API.getFixtures()]);
 
-        // Expect 2 points for playing (if > 60 mins) - FPL rule
-        expectedPoints += 2;
+        // Horizon: the next N gameweeks (transfers made now count from the next deadline)
+        const next = bootstrap.events.find(e => e.is_next);
+        const horizon = next
+            ? bootstrap.events
+                .filter(e => e.id >= next.id && e.id < next.id + this.HORIZON)
+                .map(e => ({ id: e.id, deadline: new Date(e.deadline_time) }))
+            : [];
+        const horizonIds = new Set(horizon.map(e => e.id));
 
-        // Get form multiplier
-        const form = safeValue(player.form, 3);
-        const ppg = safeValue(player.pointsPerGame, 2);
-        const formMultiplier = form > 0 ? Math.min(form / ppg, 2) : 0.8; // Cap at 2x, min 0.8x
-
-        // Use xG per 90 for more accurate goal predictions
-        const xGPer90 = safeValue(player.expectedGoalsPer90, 0);
-        const expectedGoalsForFixture = this.adjustForDifficulty(
-            xGPer90 * formMultiplier,
-            fixture.difficulty,
-            true
-        );
-
-        // Apply FPL goal scoring rules based on position
-        const goalPoints = this.SCORING_RULES.goals[player.position] || 4;
-        expectedPoints += expectedGoalsForFixture * goalPoints;
-
-        // Use xA per 90 for assists
-        const xAPer90 = safeValue(player.expectedAssistsPer90, 0);
-        const expectedAssistsForFixture = this.adjustForDifficulty(
-            xAPer90 * formMultiplier,
-            fixture.difficulty,
-            true
-        );
-        expectedPoints += expectedAssistsForFixture * this.SCORING_RULES.assists;
-
-        // ── Clean sheet, goals conceded & goalkeeper saves ──────────────────
-        if (player.position === 'GKP' || player.position === 'DEF') {
-            // 1. CS probability driven by player's own xGC per 90
-            //    xGC 0.5 → ~57% CS, xGC 1.0 → ~35%, xGC 1.5 → ~18%
-            const rawXGC = safeValue(player.expectedGoalsConcededPer90, 0);
-            const goalsConceded = safeValue(player.goalsConceded, 0);
-            // Fall back to historical GC rate if xGC unavailable
-            const xGCPer90 = rawXGC > 0 ? rawXGC : (gamesPlayed > 0 ? goalsConceded / gamesPlayed : 0.9);
-
-            // Convert xGC to CS probability: lower xGC = better defensive record
-            const baseCSProb = Math.max(0.05, Math.min(0.70, 1 - (xGCPer90 * 0.65)));
-
-            // 2. Scale by fixture difficulty (FDR 1 = easy, 5 = hard)
-            const fdrMultipliers = { 1: 1.30, 2: 1.15, 3: 1.00, 4: 0.78, 5: 0.52 };
-            const fdrMult = fdrMultipliers[fixture.difficulty] || 1.0;
-            const cleanSheetProb = Math.min(0.80, baseCSProb * fdrMult);
-
-            // 3. CS points (GKP = 6, DEF = 6)
-            const csPoints = this.SCORING_RULES.cleanSheets[player.position];
-            expectedPoints += cleanSheetProb * csPoints;
-
-            // 4. MID clean sheet 1pt (handled separately below)
-
-            // 5. Goals conceded penalty — harder fixtures raise xGC
-            //    Expected GC = xGC adjusted inversely to CS probability
-            const expectedGC = xGCPer90 * (1 / fdrMult);
-            const gcPenalty = this.expectedPerN(expectedGC, 2) * (this.SCORING_RULES.goalsConceded[player.position] || 0);
-            expectedPoints += gcPenalty; // negative value
+        // Fixtures per team per gameweek. Blank = no entry, double = two entries.
+        // Postponed fixtures have no event and drop out until they are rescheduled.
+        const fixturesByTeam = {};
+        const teamGames = {};
+        for (const f of fixtures) {
+            if (f.finished || f.finished_provisional) {
+                teamGames[f.team_h] = (teamGames[f.team_h] || 0) + 1;
+                teamGames[f.team_a] = (teamGames[f.team_a] || 0) + 1;
+                continue;
+            }
+            if (!horizonIds.has(f.event)) continue;
+            for (const [team, opponent, isHome, difficulty] of [
+                [f.team_h, f.team_a, true, f.team_h_difficulty],
+                [f.team_a, f.team_h, false, f.team_a_difficulty]
+            ]) {
+                const byEvent = fixturesByTeam[team] || (fixturesByTeam[team] = {});
+                (byEvent[f.event] || (byEvent[f.event] = [])).push({
+                    event: f.event, opponentId: opponent, isHome, difficulty, kickoffTime: f.kickoff_time
+                });
+            }
         }
 
-        // MID clean sheet (1pt)
-        if (player.position === 'MID') {
-            const fdrMultipliers = { 1: 1.30, 2: 1.15, 3: 1.00, 4: 0.78, 5: 0.52 };
-            const fdrMult = fdrMultipliers[fixture.difficulty] || 1.0;
-            const midCSProb = Math.max(0.03, 0.28 * fdrMult);
-            expectedPoints += midCSProb * this.SCORING_RULES.cleanSheets.MID;
+        // Team xG for / against per 90 from player totals. Each player's xGC is his team's xGA
+        // while he was on the pitch, so summed over the squad it is 11 x the team's xGA.
+        const agg = {};
+        const posTotals = {};
+        for (const p of bootstrap.elements) {
+            const t = agg[p.team] || (agg[p.team] = { xg: 0, xgc: 0, minutes: 0 });
+            t.xg += parseFloat(p.expected_goals) || 0;
+            t.xgc += parseFloat(p.expected_goals_conceded) || 0;
+            t.minutes += p.minutes;
+
+            // Position averages per 90, used to steady the rates of players with few minutes
+            const pos = bootstrap.element_types.find(et => et.id === p.element_type).singular_name_short;
+            const pt = posTotals[pos] || (posTotals[pos] = { minutes: 0, expectedGoals: 0, expectedAssists: 0, saves: 0, defensiveContribution: 0, bonus: 0, yellowCards: 0 });
+            pt.minutes += p.minutes;
+            pt.expectedGoals += parseFloat(p.expected_goals) || 0;
+            pt.expectedAssists += parseFloat(p.expected_assists) || 0;
+            pt.saves += p.saves;
+            pt.defensiveContribution += p.defensive_contribution || 0;
+            pt.bonus += p.bonus;
+            pt.yellowCards += p.yellow_cards;
+        }
+        const positionRates = {};
+        for (const [pos, pt] of Object.entries(posTotals)) {
+            const n90 = Math.max(1, pt.minutes / 90);
+            positionRates[pos] = Object.fromEntries(
+                Object.entries(pt).filter(([k]) => k !== 'minutes').map(([k, v]) => [k, v / n90])
+            );
         }
 
-        // Bonus points based on BPS
-        const bps = safeValue(player.bps, 0);
-        const bpsPerGame = gamesPlayed > 0 ? bps / gamesPlayed : 0;
-        // Approximate bonus probability: BPS > 30 per game often gets bonus
-        const bonusProb = Math.min(bpsPerGame / 40, 0.8);
-        const avgBonusWhenReceived = 2;
-        expectedPoints += bonusProb * avgBonusWhenReceived;
-
-        // ── Goalkeeper saves (per 3 saves = 1pt) ────────────────────────────
-        if (player.position === 'GKP') {
-            // Use saves per start rather than per 90 to avoid double-counting
-            const totalSaves = safeValue(player.saves, 0);
-            const savesPerGame = starts > 0 ? totalSaves / starts : safeValue(player.savesPer90, 0);
-            // Harder fixtures → more saves expected
-            const fdrSaveMult = { 1: 0.75, 2: 0.88, 3: 1.00, 4: 1.18, 5: 1.40 }[fixture.difficulty] || 1.0;
-            const expectedSaves = savesPerGame * fdrSaveMult;
-            expectedPoints += this.expectedPerN(expectedSaves, 3) * this.SCORING_RULES.saves.GKP;
-
-            // Penalty save probability (~3% chance of a penalty per game)
-            const penaltiesSaved = safeValue(player.penaltiesSaved, 0);
-            const penSaveProb = penaltiesSaved > 0
-                ? Math.min(0.08, (penaltiesSaved / Math.max(1, gamesPlayed)) * 0.5)
-                : 0.025;
-            expectedPoints += penSaveProb * this.SCORING_RULES.penaltySaved;
-
-            // Defensive BPS contribution for GKP (saves, sweeping)
-            if (bpsPerGame > 28) expectedPoints += 1.5;
-            else if (bpsPerGame > 20) expectedPoints += 0.8;
+        const raw = {};
+        for (const team of bootstrap.teams) {
+            const t = agg[team.id] || { xg: 0, xgc: 0, minutes: 0 };
+            raw[team.id] = t.minutes > 0
+                ? { xgFor: t.xg * 11 * 90 / t.minutes, xgAgainst: t.xgc * 90 / t.minutes }
+                : null;
         }
+        const known = Object.values(raw).filter(Boolean);
+        const leagueAvg = known.length
+            ? known.reduce((sum, t) => sum + t.xgFor, 0) / known.length
+            : 1.4;
 
-        // ── Defensive BPS bonus for outfield DEF ─────────────────────────────
-        if (player.position === 'DEF') {
-            // BPS captures tackles, interceptions, clearances
-            if (bpsPerGame > 30) expectedPoints += 1.2;
-            else if (bpsPerGame > 22) expectedPoints += 0.6;
-            else if (bpsPerGame > 15) expectedPoints += 0.2;
-        }
-
-        // ── Defensive contribution (DEF / MID / FWD) ─────────────────────────
-        const dcThreshold = this.SCORING_RULES.defensiveContributionThreshold[player.position];
-        if (dcThreshold) {
-            const dcPer90 = safeValue(player.defensiveContributionPer90, 0);
-            expectedPoints += this.probAtLeast(dcPer90, dcThreshold) * this.SCORING_RULES.defensiveContribution[player.position];
-        }
-
-        // Penalty taker bonus
-        const penOrder = safeValue(player.penaltiesOrder, 99);
-        if (penOrder === 1) {
-            // First choice penalty taker - small boost
-            expectedPoints += 0.3; // Average penalty opportunity impact
-        }
-
-        // Yellow card probability (negative points)
-        const yellowCards = safeValue(player.yellowCards, 0);
-        const yellowCardRate = gamesPlayed > 0 ? yellowCards / gamesPlayed : 0;
-        expectedPoints += yellowCardRate * this.SCORING_RULES.yellowCard;
-
-        // Apply playing chance to final score
-        const finalPoints = expectedPoints * playingChance;
-        return isNaN(finalPoints) || finalPoints < 0 ? 0 : finalPoints;
-    },
-
-    // Adjust expected value based on fixture difficulty
-    adjustForDifficulty(baseValue, difficulty, isAttacking) {
-        // Safety check for baseValue
-        if (isNaN(baseValue) || baseValue === null || baseValue === undefined) {
-            baseValue = 0;
-        }
-
-        const difficultyMultipliers = {
-            1: isAttacking ? 1.3 : 0.7,
-            2: isAttacking ? 1.15 : 0.85,
-            3: 1.0,
-            4: isAttacking ? 0.85 : 1.15,
-            5: isAttacking ? 0.7 : 1.3
-        };
-
-        const result = baseValue * (difficultyMultipliers[difficulty] || 1);
-        return isNaN(result) ? 0 : result;
-    },
-
-    // Predict points for next 5 gameweeks
-    async predictNext5Gameweeks(player) {
-        const fixtures = await FPL_API.getPlayerFixtureDifficulty(player.id);
-
-        if (!fixtures || fixtures.length === 0) {
-            return [];
-        }
-
-        return fixtures.map(fixture => {
-            const expectedPoints = this.calculateExpectedPoints(player, fixture);
-            const roundedPoints = Math.round(expectedPoints * 10) / 10;
-            return {
-                ...fixture,
-                expectedPoints: isNaN(roundedPoints) ? 0 : roundedPoints
+        // Blend with FPL's 1-5 strength rating, which is all we have before matches are played.
+        // attack > 1: scores more than average; defence > 1: concedes more than average.
+        const teams = {};
+        for (const team of bootstrap.teams) {
+            const strength = ((team.strength_overall_home || 3) + (team.strength_overall_away || 3)) / 2;
+            const prior = { attack: 1 + 0.15 * (strength - 3), defence: 1 - 0.15 * (strength - 3) };
+            const games = teamGames[team.id] || 0;
+            const w = raw[team.id] ? games / (games + this.PRIOR_GAMES) : 0;
+            teams[team.id] = {
+                shortName: team.short_name,
+                attack: w * (raw[team.id] ? raw[team.id].xgFor / leagueAvg : 1) + (1 - w) * prior.attack,
+                defence: w * (raw[team.id] ? raw[team.id].xgAgainst / leagueAvg : 1) + (1 - w) * prior.defence
             };
-        });
-    },
-
-    // Calculate total expected points for next 5 gameweeks
-    async calculatePlayerNext5GWPoints(player) {
-        const predictions = await this.predictNext5Gameweeks(player);
-
-        if (!predictions || predictions.length === 0) {
-            return 0;
         }
 
-        const total = predictions.reduce((sum, pred) => {
-            const points = parseFloat(pred.expectedPoints) || 0;
-            return sum + points;
-        }, 0);
-
-        const rounded = Math.round(total * 10) / 10;
-        return isNaN(rounded) ? 0 : rounded;
+        this.context = { bootstrap, horizon, fixturesByTeam, teamGames, teams, leagueAvg, positionRates };
+        return this.context;
     },
 
-    // Predict team points for next gameweek
+    // ── Minutes model ────────────────────────────────────────────────────────
+    // Fetch the last few matches for these players (element-summary) to see current starts / minutes.
+    async loadRecentHistory(players) {
+        const queue = players.filter(p => !(p.id in this.recentForm));
+        const avg = (rows, fn) => rows.reduce((sum, r) => sum + fn(r), 0) / rows.length;
+
+        const worker = async () => {
+            while (queue.length) {
+                const player = queue.shift();
+                this.recentForm[player.id] = null;
+                try {
+                    const details = await FPL_API.getPlayerDetails(player.id);
+                    const last = (details.history || []).slice(-this.RECENT_MATCHES);
+                    if (last.length) {
+                        this.recentForm[player.id] = {
+                            pStart: avg(last, r => r.starts),
+                            p60: avg(last, r => (r.minutes >= 60 ? 1 : 0)),
+                            minutesPerMatch: avg(last, r => r.minutes)
+                        };
+                    }
+                } catch (error) {
+                    console.error(`Recent history unavailable for ${player.name}:`, error.message);
+                }
+            }
+        };
+        await Promise.all(Array.from({ length: 6 }, worker));
+    },
+
+    // Chance of starting, of a substitute appearance and of 60+ minutes in a match he is available for
+    getMinutesProfile(player, ctx) {
+        const games = ctx.teamGames[player.teamId] || 0;
+        let pStart = games ? Math.min(1, (player.starts || 0) / games) : 0.6;
+        let minutesPerMatch = games ? Math.min(90, (player.minutes || 0) / games) : 50;
+        let p60 = pStart * 0.9;
+
+        // Recent matches count more than the season average
+        const recent = this.recentForm[player.id];
+        if (recent) {
+            pStart = 0.4 * pStart + 0.6 * recent.pStart;
+            minutesPerMatch = 0.4 * minutesPerMatch + 0.6 * recent.minutesPerMatch;
+            p60 = 0.4 * p60 + 0.6 * recent.p60;
+        }
+
+        // Minutes not explained by starts come from substitute appearances
+        const subMinutes = Math.max(0, minutesPerMatch - pStart * this.START_MINUTES);
+        const pSub = Math.min(1 - pStart, subMinutes / this.SUB_MINUTES);
+        return {
+            pStart,
+            pSub,
+            p60: Math.min(p60, pStart + pSub),
+            expectedMinutes: pStart * this.START_MINUTES + pSub * this.SUB_MINUTES
+        };
+    },
+
+    // "Expected back 18 Oct" / "Suspended until 25 Oct" -> Date, or null
+    parseReturnDate(news) {
+        const match = /(?:expected back|until)\s+(\d{1,2})\s+([A-Za-z]{3})/i.exec(news || '');
+        if (!match) return null;
+        const month = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+            .indexOf(match[2].toLowerCase());
+        if (month < 0) return null;
+        const now = new Date();
+        const date = new Date(Date.UTC(now.getUTCFullYear(), month, parseInt(match[1], 10)));
+        // A month earlier than now means next year (e.g. "Expected back 10 Jan" written in December)
+        if (date < new Date(now.getTime() - 30 * 86400000)) date.setUTCFullYear(date.getUTCFullYear() + 1);
+        return date;
+    },
+
+    // Availability for the k-th gameweek of the horizon (0 = next deadline)
+    getAvailabilityForGW(player, k, deadline) {
+        if (player.status === 'a') return 1;
+        if (player.status === 'u') return 0; // left the club / not part of the squad
+
+        // FPL's chance of playing is for the next round; later rounds use the return date when given
+        const chance = this.getAvailability(player);
+        if (k === 0) return chance;
+
+        const back = this.parseReturnDate(player.news);
+        if (back && deadline) return deadline >= back ? 1 : 0;
+
+        if (player.status === 'd') return k === 1 ? (1 + chance) / 2 : 1;
+        // Injured or suspended without a return date: out one more week, then gradually back
+        return k === 1 ? chance : Math.min(1, 0.25 * (k - 1));
+    },
+
+    // Per-90 rate of a season total, steadied with position-average minutes for small samples
+    getRate(player, total, key, ctx) {
+        const posRate = (ctx.positionRates[player.position] || {})[key] || 0;
+        const minutes = player.minutes || 0;
+        return ((parseFloat(total) || 0) + posRate * this.PRIOR_MINUTES / 90) / ((minutes + this.PRIOR_MINUTES) / 90);
+    },
+
+    // ── Points for one fixture, given he is available ───────────────────────
+    calculateFixturePoints(player, fixture, ctx, minutes) {
+        const R = this.SCORING_RULES;
+        const pos = player.position;
+        const own = ctx.teams[player.teamId];
+        const opp = ctx.teams[fixture.opponentId];
+        if (!own || !opp) return 0;
+
+        const home = fixture.isHome ? this.HOME_ADVANTAGE : 1 / this.HOME_ADVANTAGE;
+        const minutesShare = minutes.expectedMinutes / 90;
+        // His attacking rates already reflect his own team; scale by the opponent's defence
+        const attackMult = opp.defence * home;
+        // Goals his team is expected to concede in this match
+        const concede = ctx.leagueAvg * opp.attack * own.defence / home;
+        let points = 0;
+
+        // Appearance: 2 for 60+ minutes, 1 for less
+        points += minutes.p60 * R.minutesPlayed.points
+            + Math.max(0, minutes.pStart + minutes.pSub - minutes.p60) * R.minutesPlayed.underThreshold;
+
+        // Goals and assists
+        points += this.getRate(player, player.expectedGoals, 'expectedGoals', ctx) * attackMult * minutesShare * (R.goals[pos] || 0);
+        points += this.getRate(player, player.expectedAssists, 'expectedAssists', ctx) * attackMult * minutesShare * R.assists;
+
+        // Clean sheet (needs 60+ minutes), P = e^-concede
+        points += minutes.p60 * Math.exp(-concede) * (R.cleanSheets[pos] || 0);
+
+        // Goals conceded: -1 per 2 while on the pitch (GKP / DEF)
+        if (R.goalsConceded[pos]) {
+            points += minutes.pStart * this.expectedPerN(concede * this.START_MINUTES / 90, 2) * R.goalsConceded[pos];
+        }
+
+        if (pos === 'GKP') {
+            // Saves: 1 per 3; a stronger opponent attack means more shots to save
+            const saves = this.getRate(player, player.saves, 'saves', ctx) * opp.attack / home * this.START_MINUTES / 90;
+            points += minutes.pStart * this.expectedPerN(saves, 3) * R.saves.GKP;
+            // Penalty saves: roughly one penalty every 4 matches, about 1 in 5 saved
+            points += minutes.pStart * 0.25 * 0.2 * R.penaltySaved;
+        }
+
+        // Defensive contribution: 2 points for reaching the action threshold
+        const dcThreshold = R.defensiveContributionThreshold[pos];
+        if (dcThreshold) {
+            const actions = this.getRate(player, player.defensiveContribution, 'defensiveContribution', ctx) * this.START_MINUTES / 90;
+            points += minutes.pStart * this.probAtLeast(actions, dcThreshold) * R.defensiveContribution[pos];
+        }
+
+        // Bonus: his own bonus rate, nudged by how many goals his team should score
+        points += this.getRate(player, player.bonus, 'bonus', ctx) * minutesShare * Math.sqrt(attackMult);
+
+        // Yellow cards
+        points += this.getRate(player, player.yellowCards, 'yellowCards', ctx) * minutesShare * R.yellowCard;
+
+        return Math.max(0, points);
+    },
+
+    // Projected points per gameweek of the horizon (blank = 0, double = both fixtures)
+    async projectPlayer(player) {
+        const ctx = await this.getContext();
+        return this.projectPlayerSync(player, ctx);
+    },
+
+    projectPlayerSync(player, ctx) {
+        const minutes = this.getMinutesProfile(player, ctx);
+        const byEvent = ctx.fixturesByTeam[player.teamId] || {};
+        const fixtures = [];
+        const perGW = ctx.horizon.map((gw, k) => {
+            const available = this.getAvailabilityForGW(player, k, gw.deadline);
+            return (byEvent[gw.id] || []).reduce((sum, f) => {
+                const expectedPoints = available * this.calculateFixturePoints(player, f, ctx, minutes);
+                fixtures.push({
+                    ...f,
+                    opponent: ctx.teams[f.opponentId] ? ctx.teams[f.opponentId].shortName : '?',
+                    expectedPoints: Math.round(expectedPoints * 10) / 10
+                });
+                return sum + expectedPoints;
+            }, 0);
+        });
+        const weighted = perGW.reduce((sum, pts, k) => sum + pts * Math.pow(this.DECAY, k), 0);
+        return { player, perGW, weighted, total: perGW.reduce((a, b) => a + b, 0), fixtures, minutes };
+    },
+
+    // Fixture-by-fixture predictions over the horizon (used by the predictions page)
+    async predictNext5Gameweeks(player) {
+        return (await this.projectPlayer(player)).fixtures;
+    },
+
+    // Total expected points over the horizon
+    async calculatePlayerNext5GWPoints(player) {
+        const total = (await this.projectPlayer(player)).total;
+        return Math.round(total * 10) / 10;
+    },
+
+    // Predict team points for the next gameweek
     async predictTeamPoints(team) {
         if (!team || team.length === 0) {
             return [];
         }
+        await this.loadRecentHistory(team);
+        const ctx = await this.getContext();
 
-        const predictions = await Promise.all(
-            team.map(async player => {
-                const fixtures = await this.predictNext5Gameweeks(player);
-                const nextFixture = fixtures && fixtures.length > 0 ? fixtures[0] : null;
-                const expectedPoints = nextFixture ? parseFloat(nextFixture.expectedPoints) || 0 : 0;
-                return {
-                    player,
-                    expectedPoints: isNaN(expectedPoints) ? 0 : expectedPoints
-                };
-            })
-        );
-
-        return predictions;
+        return team.map(player => {
+            const projection = this.projectPlayerSync(player, ctx);
+            return { player, expectedPoints: Math.round((projection.perGW[0] || 0) * 10) / 10 };
+        });
     },
 
     // Expected points for the team: starting XI only, captain counted with his multiplier
@@ -331,270 +419,213 @@ const Predictor = {
         }, 0);
     },
 
-    // Calculate comprehensive player score using extended statistics
-    calculatePlayerScore(player) {
-        const safeValue = (value, defaultVal = 0) => {
-            const num = parseFloat(value);
-            return isNaN(num) ? defaultVal : num;
-        };
+    // ── Squad evaluation ─────────────────────────────────────────────────────
+    // Best valid XI for one gameweek plus captain (counted twice)
+    bestLineup(projections, k) {
+        const byPos = { GKP: [], DEF: [], MID: [], FWD: [] };
+        for (const pr of projections) byPos[pr.player.position].push(pr);
+        for (const list of Object.values(byPos)) list.sort((a, b) => b.perGW[k] - a.perGW[k]);
 
-        // Get all metrics
-        const form = safeValue(player.form, 3);
-        const ppg = safeValue(player.pointsPerGame, 2);
-        const minutes = safeValue(player.minutes, 0);
-        const xGPer90 = safeValue(player.expectedGoalsPer90, 0);
-        const xAPer90 = safeValue(player.expectedAssistsPer90, 0);
-        const xGIPer90 = safeValue(player.expectedGoalInvolvementsPer90, 0);
-        const bps = safeValue(player.bps, 0);
-        const ictIndex = safeValue(player.ictIndex, 0);
-        const starts = safeValue(player.starts, 0);
-        const bonus = safeValue(player.bonus, 0);
-
-        // Minutes played factor (prefer regular starters)
-        const gamesPlayed = minutes > 0 ? minutes / 90 : 1;
-        const minutesFactor = Math.min(minutes / 1000, 1.5); // Cap at 1.5x for high minutes
-
-        // Starting probability (based on starts vs games played)
-        const startProbability = gamesPlayed > 0 ? starts / gamesPlayed : 0.5;
-
-        // Calculate position-specific scores
-        let score = 0;
-
-        // Base score from form and PPG (40% weight)
-        score += (form * 3 + ppg * 2) * 0.4;
-
-        // Expected stats score (30% weight)
-        if (player.position === 'GKP') {
-            // GKP: weighted by CS per start, saves per start, defensive solidity (xGC), minutes base
-            const cleanSheets = safeValue(player.cleanSheets, 0);
-            const totalSaves = safeValue(player.saves, 0);
-            const xGCPer90 = safeValue(player.expectedGoalsConcededPer90, 0);
-
-            // CS per start — primary GKP earner (6 pts each)
-            const csPerStart = starts > 0 ? cleanSheets / starts : (gamesPlayed > 0 ? cleanSheets / gamesPlayed : 0);
-            const csScore = csPerStart * 38;
-
-            // Saves per start — bonus potential and workload indicator
-            const savesPerStart = starts > 0 ? totalSaves / starts : 0;
-            const savesScore = Math.min(28, savesPerStart * 3.2);
-
-            // xGC per 90: lower = better defensive team, more CS potential
-            const defenceScore = xGCPer90 > 0 ? Math.max(0, (1.8 - xGCPer90) * 10) : 5;
-
-            // Minutes as base reliability: rewards nailed-on starters over backups
-            const minutesScore = Math.min(12, (minutes / 2700) * 12);
-
-            score += (csScore * 0.38) + (savesScore * 0.28) + (defenceScore * 0.20) + (minutesScore * 0.14);
-        } else if (player.position === 'DEF') {
-            // Defensive score: xGC (lower = better), CS ratio, BPS, attacking contribution
-            const xGCPer90 = safeValue(player.expectedGoalsConcededPer90, 0);
-            const rawGC = safeValue(player.goalsConceded, 0);
-            const effectiveXGC = xGCPer90 > 0 ? xGCPer90 : (gamesPlayed > 0 ? rawGC / gamesPlayed : 1.0);
-
-            // Lower xGC = better: score rises as xGC falls below 1.5
-            const defenceScore = Math.max(0, (1.8 - effectiveXGC) * 18);
-
-            // Clean sheet ratio (CS per start)
-            const cleanSheets = safeValue(player.cleanSheets, 0);
-            const csRatio = starts > 0 ? cleanSheets / starts : 0;
-            const csScore = csRatio * 30;
-
-            // BPS per game — proxy for tackles, clearances, interceptions
-            const bpsPerGame = gamesPlayed > 0 ? bps / gamesPlayed : 0;
-            const bpsScore = Math.min(20, bpsPerGame * 0.55);
-
-            // Attacking threat (xGI still matters for attacking defenders)
-            const attackScore = xGIPer90 * 12;
-
-            score += (defenceScore * 0.30 + csScore * 0.30 + bpsScore * 0.25 + attackScore * 0.15);
-        } else if (player.position === 'MID') {
-            // Midfielders balanced on goals and assists
-            score += (xGIPer90 * 20) * 0.3;
-        } else { // FWD
-            // Forwards prioritize goals
-            score += (xGPer90 * 25 + xAPer90 * 10) * 0.3;
+        const xi = [];
+        const count = { GKP: 0, DEF: 0, MID: 0, FWD: 0 };
+        for (const [pos, [min]] of Object.entries(this.FORMATION)) {
+            for (const pr of byPos[pos].slice(0, min)) { xi.push(pr); count[pos]++; }
+        }
+        const rest = ['DEF', 'MID', 'FWD']
+            .flatMap(pos => byPos[pos].slice(this.FORMATION[pos][0]))
+            .sort((a, b) => b.perGW[k] - a.perGW[k]);
+        for (const pr of rest) {
+            if (xi.length >= 11) break;
+            const pos = pr.player.position;
+            if (count[pos] < this.FORMATION[pos][1]) { xi.push(pr); count[pos]++; }
         }
 
-        // BPS and ICT contribute (20% weight)
-        const bpsPerGame = gamesPlayed > 0 ? bps / gamesPlayed : 0;
-        const ictPerGame = gamesPlayed > 0 ? ictIndex / gamesPlayed : 0;
-        score += (bpsPerGame / 10 + ictPerGame / 20) * 0.2;
-
-        // Bonus factor (10% weight)
-        const bonusPerGame = gamesPlayed > 0 ? bonus / gamesPlayed : 0;
-        score += bonusPerGame * 1.5 * 0.1;
-
-        // Apply minutes and start probability multipliers
-        score *= minutesFactor;
-        score *= (0.5 + startProbability * 0.5); // Reduce score for rotation risks
-
-        // Availability penalty
-        const chanceOfPlaying = safeValue(player.chanceOfPlayingNextRound, 100);
-        if (chanceOfPlaying < 100) {
-            score *= (chanceOfPlaying / 100);
-        }
-
-        return Math.max(0, score);
+        const captain = xi.reduce((best, pr) => (!best || pr.perGW[k] > best.perGW[k] ? pr : best), null);
+        const points = xi.reduce((sum, pr) => sum + pr.perGW[k], 0) + (captain ? captain.perGW[k] : 0);
+        return { points, xi, captain };
     },
 
-    // Find best transfer options - GKP (top 2) + 3 per outfield position group
-    async findBestTransfers(currentTeam, allPlayers, budget) {
-        const positionLimits = { GKP: 2, DEF: 3, MID: 3, FWD: 3 };
-        const transferOptionsByPosition = {
-            GKP: [],
-            DEF: [],
-            MID: [],
-            FWD: []
-        };
+    // Squad value over the horizon: best XI + captain each gameweek, nearer gameweeks weighted more
+    squadValue(projections, ctx) {
+        return ctx.horizon.reduce((sum, gw, k) =>
+            sum + this.bestLineup(projections, k).points * Math.pow(this.DECAY, k), 0);
+    },
 
-        // Get current team player IDs
-        const currentPlayerIds = currentTeam.map(p => p.id);
+    // ── Transfer state: squad after pending transfers, selling prices, free transfers ──
+    async getTransferState(currentTeam, allPlayers, bank, ctx) {
+        const nextId = ctx.horizon.length ? ctx.horizon[0].id : null;
+        const settings = ctx.bootstrap.game_settings || {};
+        const maxFree = 1 + (settings.max_extra_free_transfers ?? 4);
+        const sellOnFee = settings.transfers_sell_on_fee ?? 0.5;
 
-        // Calculate scores for all available players
-        const playersWithScores = allPlayers
-            .filter(p => !currentPlayerIds.includes(p.id) && p.status === 'a')
-            .map(player => ({
-                ...player,
-                comprehensiveScore: this.calculatePlayerScore(player)
-            }));
+        let transfers = [];
+        let history = { current: [], chips: [] };
+        try {
+            [transfers, history] = await Promise.all([FPL_API.getEntryTransfers(), FPL_API.getManagerHistory()]);
+        } catch (error) {
+            console.error('Transfer history unavailable, assuming 1 free transfer and current prices:', error.message);
+        }
 
-        // Calculate expected points for current team
-        const currentTeamWithPredictions = await Promise.all(
-            currentTeam.map(async player => {
-                const next5GWPoints = await this.calculatePlayerNext5GWPoints(player);
-                const score = this.calculatePlayerScore(player);
-                return {
-                    ...player,
-                    expectedNext5GW: next5GWPoints,
-                    comprehensiveScore: score
-                };
-            })
-        );
+        const chipFor = event => ((history.chips || []).find(c => c.event === event) || {}).name;
+        const byId = new Map(allPlayers.map(p => [p.id, p]));
 
-        // Process each position group (GKP, DEF, MID, FWD)
-        for (const targetPosition of ['GKP', 'DEF', 'MID', 'FWD']) {
-            // Get current players in this position, sorted by score (weakest first)
-            const currentInPosition = currentTeamWithPredictions
-                .filter(p => p.position === targetPosition)
-                .sort((a, b) => a.comprehensiveScore - b.comprehensiveScore);
+        // Transfers already made for the next deadline: apply them to the squad and bank
+        const pending = transfers.filter(tr => tr.event === nextId);
+        let squad = currentTeam.slice();
+        for (const tr of pending.slice().reverse()) {
+            const incoming = byId.get(tr.element_in);
+            const idx = squad.findIndex(p => p.id === tr.element_out);
+            if (incoming && idx >= 0) {
+                squad[idx] = { ...incoming, pickOrder: squad[idx].pickOrder, multiplier: squad[idx].multiplier };
+                bank += (tr.element_out_cost - tr.element_in_cost) / 10;
+            }
+        }
 
-            if (currentInPosition.length === 0) continue;
+        // Selling price: purchase price + half the rise (rounded down), or the current price if it fell.
+        // Purchase price = latest transfer in (Free Hit squads revert, so skip those), else the start price.
+        const sellingPrice = {};
+        for (const p of squad) {
+            const now = Math.round(p.price * 10);
+            const buyIn = transfers.find(tr => tr.element_in === p.id && chipFor(tr.event) !== 'freehit');
+            const bought = buyIn ? buyIn.element_in_cost : now - (p.costChangeStart || 0);
+            sellingPrice[p.id] = (now <= bought ? now : bought + Math.floor((now - bought) * sellOnFee)) / 10;
+        }
 
-            // Look at weakest 60% of players in this position
-            const weakestCount = Math.max(1, Math.ceil(currentInPosition.length * 0.6));
-            const weakestInPosition = currentInPosition.slice(0, weakestCount);
+        // Free transfers: one from the second gameweek played, +1 each deadline (max 5),
+        // Wildcard and Free Hit leave the banked ones untouched
+        let freeTransfers = 1;
+        const played = (history.current || []).filter(e => !nextId || e.event < nextId);
+        for (const e of played.slice(1)) {
+            const chip = chipFor(e.event);
+            if (chip !== 'wildcard' && chip !== 'freehit') {
+                const free = e.event_transfers - e.event_transfers_cost / this.HIT_COST;
+                freeTransfers = Math.max(0, freeTransfers - free);
+            }
+            freeTransfers = Math.min(maxFree, freeTransfers + 1);
+        }
+        if (played.length === 0) freeTransfers = 1;
+        freeTransfers = Math.max(0, freeTransfers - pending.length);
 
-            for (const currentPlayer of weakestInPosition) {
-                // Find potential replacements in same position
-                const replacements = playersWithScores.filter(p => {
-                    const price = parseFloat(p.price) || 0;
-                    const currentPrice = parseFloat(currentPlayer.price) || 0;
-                    const safeChance = parseFloat(p.chanceOfPlayingNextRound) || 100;
+        return { squad, bank: Math.round(bank * 10) / 10, sellingPrice, freeTransfers, pending, maxFree };
+    },
 
-                    return p.position === targetPosition &&
-                        price <= currentPrice + budget &&
-                        safeChance >= 75 &&
-                        p.comprehensiveScore > currentPlayer.comprehensiveScore * 0.85; // Allow slight improvements
+    // ── Transfer suggestions ─────────────────────────────────────────────────
+    // Every single transfer is scored by how much it changes the squad value over the horizon
+    // (best XI + captain each gameweek), within budget and the 3-per-club limit.
+    async getTransferPlan(currentTeam, allPlayers, bank) {
+        const ctx = await this.getContext();
+        const state = await this.getTransferState(currentTeam, allPlayers, bank, ctx);
+        const plan = { ...state, horizon: ctx.horizon, transfers: [] };
+        if (!ctx.horizon.length) return plan;
+
+        const squadIds = new Set(state.squad.map(p => p.id));
+        const clubLimit = (ctx.bootstrap.game_settings || {}).squad_team_limit || 3;
+        const clubCount = {};
+        for (const p of state.squad) clubCount[p.teamId] = (clubCount[p.teamId] || 0) + 1;
+
+        // Shortlist per position by projection (season minutes), affordable for at least one sale
+        const shortlist = {};
+        for (const pos of ['GKP', 'DEF', 'MID', 'FWD']) {
+            const maxSell = Math.max(0, ...state.squad.filter(p => p.position === pos).map(p => state.sellingPrice[p.id]));
+            shortlist[pos] = allPlayers
+                .filter(p => p.position === pos && !squadIds.has(p.id) && p.status !== 'u' && p.price <= state.bank + maxSell + 1e-9)
+                .map(p => this.projectPlayerSync(p, ctx))
+                .sort((a, b) => b.weighted - a.weighted)
+                .slice(0, 8)
+                .map(pr => pr.player);
+        }
+
+        // Recent minutes for the squad and the shortlist, then project again with them
+        await this.loadRecentHistory([...state.squad, ...Object.values(shortlist).flat()]);
+        const squadProj = state.squad.map(p => this.projectPlayerSync(p, ctx));
+        const baseValue = this.squadValue(squadProj, ctx);
+        const baseLineups = ctx.horizon.map((gw, k) => this.bestLineup(squadProj, k));
+
+        const options = [];
+        for (const [idx, out] of state.squad.entries()) {
+            const sell = state.sellingPrice[out.id];
+            for (const candidate of shortlist[out.position]) {
+                if (candidate.price > state.bank + sell + 1e-9) continue;
+                const clubAfter = (clubCount[candidate.teamId] || 0) + (candidate.teamId === out.teamId ? 0 : 1);
+                if (clubAfter > clubLimit) continue;
+
+                const inProj = this.projectPlayerSync(candidate, ctx);
+                const newProj = squadProj.slice();
+                newProj[idx] = inProj;
+                const gain = this.squadValue(newProj, ctx) - baseValue;
+                if (gain < 0.5) continue;
+
+                options.push({
+                    out: { ...out, sellingPrice: sell },
+                    in: candidate,
+                    position: out.position,
+                    cost: Math.round((candidate.price - sell) * 10) / 10,
+                    expectedPointsGain: Math.round(gain * 10) / 10,
+                    outProjection: squadProj[idx],
+                    inProjection: inProj,
+                    outStartsGWs: baseLineups.filter(l => l.xi.includes(squadProj[idx])).length,
+                    reason: ''
                 });
-
-                // Sort by comprehensive score
-                replacements.sort((a, b) => b.comprehensiveScore - a.comprehensiveScore);
-
-                // Take top 5 for consideration
-                const topReplacements = replacements.slice(0, 5);
-
-                for (const replacement of topReplacements) {
-                    const replacementExpected = await this.calculatePlayerNext5GWPoints(replacement);
-                    const currentExpected = parseFloat(currentPlayer.expectedNext5GW) || 0;
-                    const pointsGain = replacementExpected - currentExpected;
-
-                    const currentPrice = parseFloat(currentPlayer.price) || 0;
-                    const replacementPrice = parseFloat(replacement.price) || 0;
-                    const roundedGain = Math.round(pointsGain * 10) / 10;
-
-                    // Calculate a transfer priority score
-                    const scoreDiff = replacement.comprehensiveScore - currentPlayer.comprehensiveScore;
-                    const transferPriority = scoreDiff + pointsGain;
-
-                    transferOptionsByPosition[targetPosition].push({
-                        out: currentPlayer,
-                        in: replacement,
-                        cost: replacementPrice - currentPrice,
-                        expectedPointsGain: isNaN(roundedGain) ? 0 : roundedGain,
-                        scoreDifference: Math.round(scoreDiff * 10) / 10,
-                        transferPriority: Math.round(transferPriority * 10) / 10,
-                        reason: this.getTransferReason(currentPlayer, replacement),
-                        position: targetPosition
-                    });
-                }
             }
-
-            // Sort this position's transfers by priority
-            transferOptionsByPosition[targetPosition].sort((a, b) =>
-                b.transferPriority - a.transferPriority
-            );
-
-            // Ensure we have at least 3 for this position if possible
-            if (transferOptionsByPosition[targetPosition].length < 3 && currentInPosition.length > 0) {
-                // Relax constraints to get more options
-                for (const currentPlayer of currentInPosition) {
-                    if (transferOptionsByPosition[targetPosition].length >= 3) break;
-
-                    const replacements = playersWithScores.filter(p => {
-                        const price = parseFloat(p.price) || 0;
-                        const currentPrice = parseFloat(currentPlayer.price) || 0;
-
-                        return p.position === targetPosition &&
-                            price <= currentPrice + budget + 1.5 && // Allow up to 1.5m over
-                            p.comprehensiveScore > currentPlayer.comprehensiveScore * 0.8; // Allow more similar players
-                    });
-
-                    replacements.sort((a, b) => b.comprehensiveScore - a.comprehensiveScore);
-
-                    const alreadyHasOut = transferOptionsByPosition[targetPosition]
-                        .find(tr => tr.out.id === currentPlayer.id);
-
-                    if (replacements.length > 0 && !alreadyHasOut) {
-                        const replacement = replacements[0];
-                        const replacementExpected = await this.calculatePlayerNext5GWPoints(replacement);
-                        const currentExpected = parseFloat(currentPlayer.expectedNext5GW) || 0;
-                        const pointsGain = replacementExpected - currentExpected;
-                        if (pointsGain < 1.0) continue; // skip if not a meaningful improvement
-                        const scoreDiff = replacement.comprehensiveScore - currentPlayer.comprehensiveScore;
-
-                        transferOptionsByPosition[targetPosition].push({
-                            out: currentPlayer,
-                            in: replacement,
-                            cost: replacement.price - currentPlayer.price,
-                            expectedPointsGain: Math.round(pointsGain * 10) / 10,
-                            scoreDifference: Math.round(scoreDiff * 10) / 10,
-                            transferPriority: Math.round((scoreDiff + pointsGain) * 10) / 10,
-                            reason: this.getTransferReason(currentPlayer, replacement),
-                            position: targetPosition
-                        });
-                    }
-                }
-            }
-
-            // Take position limit (GKP=2, outfield=3)
-            const limit = positionLimits[targetPosition] || 3;
-            transferOptionsByPosition[targetPosition] = transferOptionsByPosition[targetPosition].slice(0, limit);
         }
 
-        // Combine all position groups (GKP first, then outfield)
-        const allTransfers = [
-            ...transferOptionsByPosition.GKP,
-            ...transferOptionsByPosition.DEF,
-            ...transferOptionsByPosition.MID,
-            ...transferOptionsByPosition.FWD
-        ].filter(tr => (tr.expectedPointsGain || 0) >= 1.0);
+        // Keep the best options per position (GKP 2, outfield 3), at most 2 per player sold
+        const limits = { GKP: 2, DEF: 3, MID: 3, FWD: 3 };
+        options.sort((a, b) => b.expectedPointsGain - a.expectedPointsGain);
+        const perOut = {};
+        const perPos = {};
+        for (const option of options) {
+            if ((perPos[option.position] || 0) >= limits[option.position]) continue;
+            if ((perOut[option.out.id] || 0) >= 2) continue;
+            perPos[option.position] = (perPos[option.position] || 0) + 1;
+            perOut[option.out.id] = (perOut[option.out.id] || 0) + 1;
 
-        return allTransfers;
+            const hitCost = state.freeTransfers >= 1 ? 0 : this.HIT_COST;
+            option.hitCost = hitCost;
+            option.netGain = Math.round((option.expectedPointsGain - hitCost) * 10) / 10;
+            // With a free transfer, worth making above ~2 points; a hit needs to clear its 4 points by the same margin
+            option.verdict = option.netGain >= 2 ? (hitCost ? 'hit' : 'make') : 'marginal';
+            option.reason = this.getTransferReason(option.out, option.in, option, ctx);
+            plan.transfers.push(option);
+        }
+
+        return plan;
     },
 
-    // Get reason for transfer suggestion
-    getTransferReason(playerOut, playerIn) {
+    // Kept for callers that only need the list
+    async findBestTransfers(currentTeam, allPlayers, budget) {
+        return (await this.getTransferPlan(currentTeam, allPlayers, budget)).transfers;
+    },
+
+    // Reasons for a transfer: model-based first (availability, minutes, fixtures, projection), then stats
+    getTransferReason(playerOut, playerIn, option, ctx) {
         const reasons = [];
+        if (option && ctx) {
+            const outProj = option.outProjection;
+            const inProj = option.inProjection;
+            const first = ctx.horizon[0];
+            const last = ctx.horizon[ctx.horizon.length - 1];
+            const range = first === last ? `GW${first.id}` : `GW${first.id}-${last.id}`;
+
+            if (this.getAvailabilityForGW(playerOut, 0, first.deadline) < 0.5) {
+                reasons.push(`${playerOut.name} unavailable${playerOut.news ? ` (${playerOut.news})` : ''}`);
+            }
+            if (option.outStartsGWs === 0) {
+                reasons.push(`${playerOut.name} would not make your XI`);
+            }
+            if (inProj.minutes.pStart > outProj.minutes.pStart + 0.25) {
+                reasons.push(`Starts more often (${Math.round(inProj.minutes.pStart * 100)}% vs ${Math.round(outProj.minutes.pStart * 100)}%)`);
+            }
+            const fixtureCount = pr => ctx.horizon.map(gw => pr.fixtures.filter(f => f.event === gw.id).length);
+            const outCount = fixtureCount(outProj);
+            const inCount = fixtureCount(inProj);
+            ctx.horizon.forEach((gw, k) => {
+                if (inCount[k] > 1 && outCount[k] <= 1) reasons.push(`Double gameweek in GW${gw.id}`);
+                if (outCount[k] === 0 && inCount[k] > 0) reasons.push(`${playerOut.name} blanks in GW${gw.id}`);
+            });
+            reasons.push(`Projects ${inProj.total.toFixed(1)} vs ${outProj.total.toFixed(1)} pts (${range})`);
+        }
+        if (reasons.length >= 3) return reasons.slice(0, 3).join('; ');
 
         const outForm = parseFloat(playerOut.form) || 0;
         const outChance = this.getAvailability(playerOut) * 100;

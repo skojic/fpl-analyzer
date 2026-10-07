@@ -631,11 +631,12 @@ async function loadTransferSuggestions() {
         }
 
         const teamData = await FPL_API.getTeamComposition();
-        const budget = teamData.entryHistory ? teamData.entryHistory.bank / 10 : 0;
+        const bank = teamData.entryHistory ? teamData.entryHistory.bank / 10 : 0;
 
         content.innerHTML = `<div class="loading">${t('loadingTransfers')}</div>`;
 
-        const transfers = await Predictor.findBestTransfers(appData.myTeam, appData.allPlayers, budget);
+        const plan = await Predictor.getTransferPlan(appData.myTeam, appData.allPlayers, bank);
+        const transfers = plan.transfers;
 
         if (transfers.length === 0) {
             content.innerHTML = `<div style="text-align: center; padding: 40px;">${t('noTransfers')}</div>`;
@@ -645,42 +646,38 @@ async function loadTransferSuggestions() {
         const positionColors = { GKP: '#f59e0b', DEF: '#3b82f6', MID: '#8b5cf6', FWD: '#ef4444' };
         const positionEmojis = { GKP: '🧤', DEF: '🛡️', MID: '⚡', FWD: '⚽' };
         const positionNames  = { GKP: t('gkpFull'), DEF: t('defFull'), MID: t('midFull'), FWD: t('fwdFull') };
+        const verdictLabels  = { make: t('verdictMake'), hit: t('verdictHit'), marginal: t('verdictMarginal') };
+        const horizon = plan.horizon.length ? `GW${plan.horizon[0].id}–${plan.horizon[plan.horizon.length - 1].id}` : '';
 
-        // All transfers sorted by expected points gain descending
-        const sorted = [...transfers]
-            .sort((a, b) => (b.expectedPointsGain || 0) - (a.expectedPointsGain || 0));
+        let html = `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+            <h4 style="margin:0; font-size:0.9em;">${t('sortedByGain')} · ${horizon}</h4>
+            <span style="font-size:0.75em; color:var(--text-muted);">${t('budget')}: £${safeNumber(plan.bank, 1)}m · ${t('freeTransfers')}: ${plan.freeTransfers}</span>
+        </div>
+        <div style="font-size:0.7em; color:var(--text-muted); margin-bottom:8px;">${t('alternativesNote')}</div>`;
 
-        let html = `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <h4 style="margin:0; font-size:0.9em;">${t('sortedByGain')}</h4>
-            <span style="font-size:0.75em; color:var(--text-muted);">${t('budget')}: £${safeNumber(budget, 1)}m</span>
-        </div>`;
-
-        for (const tr of sorted) {
+        // Already sorted by projected gain
+        for (const tr of transfers) {
             const gain     = safeNumber(tr.expectedPointsGain, 1);
             const costSign = tr.cost >= 0 ? '+' : '';
             const pos      = tr.position || tr.in?.position || 'MID';
             const color    = positionColors[pos] || '#22c55e';
             const emoji    = positionEmojis[pos] || '🔄';
             const posLabel = positionNames[pos]  || pos;
-            const isGKP    = pos === 'GKP';
-            const outSub   = isGKP
-                ? `CS:${safeNumber(tr.out.cleanSheets,0)} S/G:${safeNumber(parseFloat(tr.out.saves||0)/Math.max(1,parseFloat(tr.out.starts||1)),1)}`
-                : `Form:${safeNumber(tr.out.form,1)} Pts:${safeNumber(tr.out.points,0)}`;
-            const inSub    = isGKP
-                ? `CS:${safeNumber(tr.in.cleanSheets,0)} S/G:${safeNumber(parseFloat(tr.in.saves||0)/Math.max(1,parseFloat(tr.in.starts||1)),1)}`
-                : `Form:${safeNumber(tr.in.form,1)} ${costSign}£${safeNumber(tr.cost,1)}m`;
+            const outSub   = `xPts:${safeNumber(tr.outProjection.total,1)}`;
+            const inSub    = `xPts:${safeNumber(tr.inProjection.total,1)} ${costSign}£${safeNumber(tr.cost,1)}m`;
 
             html += `
                 <div style="margin-bottom:5px; border-radius:8px; border:1.5px solid ${color}22; overflow:hidden;">
-                    <div style="background:${color}18; border-left:4px solid ${color}; padding:3px 8px; display:flex; justify-content:space-between; align-items:center;">
+                    <div style="background:${color}18; border-left:4px solid ${color}; padding:3px 8px; display:flex; align-items:center;">
                         <span style="font-size:0.75em; font-weight:700; color:${color};">${emoji} ${posLabel}</span>
-                        <span style="background:${color}; color:white; padding:1px 7px; border-radius:12px; font-size:0.72em; font-weight:700;">+${gain} pts</span>
+                        <span style="font-size:0.68em; color:var(--text-muted); margin-left:auto; margin-right:6px;">${verdictLabels[tr.verdict] || ''}</span>
+                        <span style="background:${tr.verdict === 'marginal' ? '#9ca3af' : color}; color:white; padding:1px 7px; border-radius:12px; font-size:0.72em; font-weight:700;">+${gain} pts</span>
                     </div>
                     <div style="padding:4px 8px; display:flex; align-items:center; gap:6px; font-size:0.78em;">
                         <div style="flex:1; min-width:0;">
                             <span style="font-weight:700; color:#dc2626; font-size:0.72em; text-transform:uppercase; margin-right:3px;">${t('transferOut')}</span>
                             <span style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:inline-block; max-width:80px; vertical-align:bottom;">${tr.out.name}</span>
-                            <div style="color:var(--text-muted); font-size:0.8em;">£${safeNumber(tr.out.price,1)}m · ${outSub}</div>
+                            <div style="color:var(--text-muted); font-size:0.8em;">${t('sellPrice')} £${safeNumber(tr.out.sellingPrice,1)}m · ${outSub}</div>
                         </div>
                         <div style="color:var(--text-muted); flex-shrink:0; font-size:1.1em;">→</div>
                         <div style="flex:1; min-width:0;">
