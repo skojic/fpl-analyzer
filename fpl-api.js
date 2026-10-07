@@ -13,7 +13,9 @@ const FPL_API = {
         fixtures: null,
         managerHistory: null,
         entryTransfers: null,
-        playerDetails: {}
+        playerDetails: {},
+        leagues: {},
+        entryPicks: {}
     },
 
     // Helper to build URL - uses the same-origin Vercel proxy (api/proxy.js) in browser, direct in Node.js
@@ -69,6 +71,19 @@ const FPL_API = {
         }
 
         throw lastError;
+    },
+
+    // Transfer planner preferences (locked / banned player ids), saved per team in the browser
+    getPlanPrefs() {
+        try {
+            return { locked: [], banned: [], ...JSON.parse(localStorage.getItem(`fpl_plan_prefs_${this.TEAM_ID}`) || '{}') };
+        } catch (e) {
+            return { locked: [], banned: [] };
+        }
+    },
+
+    savePlanPrefs(prefs) {
+        localStorage.setItem(`fpl_plan_prefs_${this.TEAM_ID}`, JSON.stringify(prefs));
     },
 
     // Fetch bootstrap-static data (all players, teams, gameweeks)
@@ -140,6 +155,37 @@ const FPL_API = {
         } catch (error) {
             console.error('Error fetching fixtures:', error);
             throw new Error(`Failed to load fixture data: ${error.message}`);
+        }
+    },
+
+    // Classic league standings (first page: up to 50 managers)
+    async getLeagueStandings(leagueId) {
+        if (this.cache.leagues[leagueId]) return this.cache.leagues[leagueId];
+
+        try {
+            const url = `${this.BASE_URL}/leagues-classic/${leagueId}/standings/`;
+            const data = await this.fetchWithRetry(url);
+            this.cache.leagues[leagueId] = data;
+            return data;
+        } catch (error) {
+            console.error('Error fetching league:', error);
+            throw new Error(`Failed to load league ${leagueId}: ${error.message}`);
+        }
+    },
+
+    // Any manager's picks for a gameweek (rivals in a league)
+    async getEntryPicks(entryId, gameweek) {
+        const key = `${entryId}:${gameweek}`;
+        if (this.cache.entryPicks[key]) return this.cache.entryPicks[key];
+
+        try {
+            const url = `${this.BASE_URL}/entry/${entryId}/event/${gameweek}/picks/`;
+            const data = await this.fetchWithRetry(url);
+            this.cache.entryPicks[key] = data;
+            return data;
+        } catch (error) {
+            console.error('Error fetching picks:', error);
+            throw new Error(`Failed to load picks of manager ${entryId}: ${error.message}`);
         }
     },
 
@@ -236,6 +282,9 @@ const FPL_API = {
             expectedGoalsConcededPer90: parseFloat(player.expected_goals_conceded_per_90),
             savesPer90: parseFloat(player.saves_per_90),
             defensiveContribution: player.defensive_contribution,
+            tackles: player.tackles,
+            clearancesBlocksInterceptions: player.clearances_blocks_interceptions,
+            recoveries: player.recoveries,
             defensiveContributionPer90: parseFloat(player.defensive_contribution_per_90),
 
             // Additional stats

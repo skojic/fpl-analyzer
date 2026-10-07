@@ -27,6 +27,10 @@
         .card-content {
             max-height: none;
         }
+        /* Plain table: the global table styles are built for the wide, sticky player database */
+        .acc-table { width: auto; min-width: 0; border-collapse: collapse; margin: 10px 0; }
+        .acc-table th, .acc-table td { position: static; box-shadow: none; cursor: default; padding: 4px 14px 4px 0; background: transparent; color: inherit; font-size: 1em; border: none; text-align: left; }
+        .acc-table .num { text-align: right; }
     </style>
 </head>
 <body>
@@ -58,6 +62,30 @@
                 return decimals > 0 ? defaultValue.toFixed(decimals) : defaultValue;
             }
             return decimals > 0 ? num.toFixed(decimals) : Math.round(num);
+        }
+
+        // Backtest results published by scripts/backtest.js (refreshed by the daily data job)
+        async function accuracyHtml() {
+            try {
+                const response = await fetch('data/accuracy.json', { cache: 'no-cache' });
+                if (!response.ok) return '';
+                const acc = await response.json();
+                const o = acc.overall;
+                const first = acc.gameweeks[0].gameweek;
+                const last = acc.gameweeks[acc.gameweeks.length - 1].gameweek;
+                const row = (name, st) => `<tr><td>${name}</td><td class="num">${st.mae.toFixed(2)}</td><td class="num">${st.corr.toFixed(2)}</td></tr>`;
+                return `<h3 style="margin-top: 30px; color: var(--primary-color);">${t('accTitle')}</h3>
+                    <div class="stats-info" style="font-size:0.84em; line-height:1.6;">
+                        ${t('accExplain').replace('{range}', `GW${first}–${last}`).replace('{n}', o.model.n)}
+                        <table class="acc-table">
+                            <tr><th></th><th class="num">${t('accMae')}</th><th class="num">${t('accCorr')}</th></tr>
+                            ${row(t('accModel'), o.model)}${row(t('accPPG'), o.baselinePPG)}${row(t('accForm'), o.baselineForm)}
+                        </table>
+                        ${t('accTop10').replace('{model}', o.top10Actual.model).replace('{form}', o.top10Actual.form)}
+                    </div>`;
+            } catch (error) {
+                return '';
+            }
         }
 
         async function loadPredictions() {
@@ -186,6 +214,7 @@
                     `;
                 }
 
+                html += await accuracyHtml();
                 content.innerHTML = html;
             } catch (error) {
                 content.innerHTML = `<div class="loading">${t('errorPredictions')}</div>`;

@@ -466,6 +466,26 @@
                     <div class="loading" data-i18n="loadingTransfers">Analyzing transfers...</div>
                 </div>
             </div>
+            <!-- Mini-League Card -->
+            <div class="card" data-card="league">
+                <div class="card-header">
+                    <h2 data-i18n="cardLeague">Mini-League</h2>
+                    <button class="expand-btn" onclick="openCardPage('league.html')">⤢</button>
+                </div>
+                <div class="card-content" id="league-content">
+                    <div class="loading" data-i18n="loadingLeague">Loading league...</div>
+                </div>
+            </div>
+            <!-- Fixture Analyser Card -->
+            <div class="card" data-card="fixtures">
+                <div class="card-header">
+                    <h2 data-i18n="cardFixtures">Fixture Analyser</h2>
+                    <button class="expand-btn" onclick="openCardPage('fixtures.html')">⤢</button>
+                </div>
+                <div class="card-content" id="fixtures-content">
+                    <div class="loading" data-i18n="loadingFixtures">Loading fixtures...</div>
+                </div>
+            </div>
             <!-- Player Comparison Card -->
             <div class="card" data-card="comparison">
                 <div class="card-header">
@@ -505,6 +525,7 @@
     </style>
     <script src="fpl-api.js"></script>
     <script src="prediction.js"></script>
+    <script src="league.js"></script>
     <script src="app.js"></script>
 
     <!-- ═══════════════════════════════════════════════════════

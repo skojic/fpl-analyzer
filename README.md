@@ -51,6 +51,25 @@ Link to the APP: https://fpl-analyzer-eosin.vercel.app/
 - "Players to Watch" section by position
 - Value score calculations (points per million)
 
+### 🗓️ Transfer Plan (multi-week)
+- Searches plans over the next 5 gameweeks: each week roll, make one or make two transfers, paying −4 hits beyond your free transfers, and keeps the best plans (beam search)
+- Banked free transfers count for ~2 pts each, so rolling stays an option
+- **Lock** players you want to keep and **ban** players you never want to buy; choices are saved in your browser per team
+- Shown on the Transfers page as a gameweek timeline, and as a one-line plan on the dashboard card
+
+### 🏆 Mini-League
+- Standings of your classic leagues (private ones first; large public leagues use the top 50)
+- **Effective ownership (EO)** among your rivals: 100% per starting owner, 200% per captain
+- **Threats** (players your rivals own and you don't), **differentials**, rivals' captains and the league template, each with the projected point swing for the next gameweek
+
+### 📅 Fixture Analyser
+- Next 8 gameweeks for every team, coloured by the model's expected goals (attack), clean-sheet chance (defence) or FPL difficulty
+- Shows blank and double gameweeks; sort by the next 3, 5 or 8 gameweeks
+
+### 🎯 Model Accuracy
+- `scripts/backtest.js` rebuilds each finished gameweek from the matches before it, projects it and compares with the points actually scored, against points-per-game and form baselines
+- Results are published in `data/accuracy.json` and shown on the Predictions page; a free daily GitHub Actions job (`.github/workflows/data.yml`) refreshes them
+
 ### ⚖️ Player Comparison
 - Compare **up to 3 players** side-by-side in a dedicated full-page view
 - Inline search with live autocomplete for fast player lookup
@@ -148,7 +167,13 @@ fpl-analyzer/
 ├── transfers.html          # Expanded transfers view
 ├── comparison.html         # Full-page player comparison view
 ├── manifest.json           # PWA manifest (installable app)
+├── league.js               # Mini-league effective ownership
+├── league.html             # Expanded mini-league view
+├── fixtures.html           # Fixture analyser
 ├── api/proxy.js            # Vercel serverless proxy for the FPL API
+├── scripts/backtest.js     # Model accuracy backtest (`npm run backtest`)
+├── data/accuracy.json      # Latest backtest results (refreshed daily)
+├── .github/workflows/data.yml  # Free daily data refresh
 ├── vercel.json             # Vercel project config
 ├── package.json            # Node version for Vercel, `npm test`
 ├── test-api.js             # Checks the API client and proxy (`npm test`)

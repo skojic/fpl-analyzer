@@ -5,6 +5,8 @@
 const FPL_API = require('./fpl-api.js');
 global.FPL_API = FPL_API; // prediction.js expects the browser global
 const Predictor = require('./prediction.js');
+global.Predictor = Predictor; // league.js expects the browser global
+const League = require('./league.js');
 const proxy = require('./api/proxy.js');
 
 // Minimal stand-in for Vercel's request/response objects
@@ -78,6 +80,48 @@ const tests = [
         }
         if (!(plan.freeTransfers >= 0 && plan.freeTransfers <= plan.maxFree)) throw new Error(`free transfers ${plan.freeTransfers}`);
         return `${plan.transfers.length} options, ${plan.freeTransfers} FT, XI ${lineup.points.toFixed(1)} pts`;
+    }],
+    ['Planner: multi-week plan respects locks, bans, budget and club limit', async () => {
+        const team = await FPL_API.getTeamComposition();
+        const players = await FPL_API.getAllPlayers();
+        const bank = team.entryHistory.bank / 10;
+        const first = await Predictor.planTransfers(team.picks, players, bank);
+        const bought = first.steps.flatMap(st => st.moves.map(m => m.in.id));
+        const sold = first.steps.flatMap(st => st.moves.map(m => m.out.id));
+        const prefs = { locked: sold.slice(0, 1), banned: bought.slice(0, 1) };
+        const plan = await Predictor.planTransfers(team.picks, players, bank, prefs);
+
+        let squad = plan.squad.slice();
+        let money = plan.bank;
+        const sell = { ...plan.sellingPrice };
+        for (const st of plan.steps) {
+            if (st.moves.length > 2) throw new Error(`GW${st.gw}: ${st.moves.length} moves`);
+            for (const m of st.moves) {
+                if (prefs.locked.includes(m.out.id)) throw new Error(`sold locked ${m.out.name}`);
+                if (prefs.banned.includes(m.in.id)) throw new Error(`bought banned ${m.in.name}`);
+                money += sell[m.out.id] - m.in.price;
+                sell[m.in.id] = m.in.price;
+                squad = squad.map(p => (p.id === m.out.id ? m.in : p));
+            }
+            if (money < -1e-9) throw new Error(`GW${st.gw}: bank ${money.toFixed(1)}`);
+            const perClub = {};
+            for (const p of squad) perClub[p.teamId] = (perClub[p.teamId] || 0) + 1;
+            if (Math.max(...Object.values(perClub)) > 3) throw new Error(`GW${st.gw}: club limit`);
+        }
+        if (plan.gain < 0) throw new Error(`plan worse than rolling: ${plan.gain}`);
+        return `+${first.gain} pts, with lock/ban +${plan.gain}`;
+    }],
+    ['League: effective ownership adds up per rival', async () => {
+        const leagues = await League.getMyLeagues();
+        if (!leagues.length) return 'no leagues';
+        const a = await League.analyze(leagues[0].id);
+        // Each rival fields 11 starters plus a captain (x2), more with Triple Captain / Bench Boost
+        const total = a.rows.reduce((sum, r) => sum + r.eo, 0);
+        if (total < 11.9 || total > 16.1) throw new Error(`EO sums to ${total.toFixed(2)} per rival`);
+        for (const r of a.rows) {
+            if (Math.abs(r.exposure - (r.yours - r.eo) * r.xPts) > 1e-9) throw new Error(`exposure of ${r.player.name}`);
+        }
+        return `${a.league.name}: ${a.rivalsSampled} rivals, EO total ${(total * 100).toFixed(0)}%`;
     }],
     ['Model: return date parsing', async () => {
         const d = Predictor.parseReturnDate('Hamstring injury - Expected back 18 Oct');

@@ -54,6 +54,22 @@
         [data-theme="dark"] .transfer-reason {
             border-top-color: rgba(255,255,255,0.10);
         }
+        /* Multi-week transfer plan */
+        .plan-header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+        .plan-gain { background: var(--secondary-color); color: #37003c; padding: 4px 12px; border-radius: 20px; font-weight: 800; font-size: 0.9em; }
+        .plan-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 14px 0; }
+        .plan-step { border: 1.5px solid rgba(55,0,60,0.15); border-radius: 10px; padding: 10px; font-size: 0.85em; }
+        [data-theme="dark"] .plan-step { border-color: rgba(255,255,255,0.12); }
+        .plan-step.roll { opacity: 0.75; }
+        .plan-step-gw { font-weight: 800; color: var(--primary-color); display: flex; justify-content: space-between; }
+        .plan-hit { color: #e0004d; font-weight: 800; }
+        .plan-move { margin: 6px 0; line-height: 1.4; }
+        .plan-meta { margin-top: 6px; font-size: 0.85em; color: var(--text-muted, #666); }
+        .plan-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 12px; }
+        .plan-chip { border: 1px solid rgba(55,0,60,0.25); background: transparent; color: inherit; border-radius: 14px; padding: 3px 10px; font-size: 0.8em; cursor: pointer; }
+        .plan-chip.on { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+        .plan-ban { border: none; background: none; cursor: pointer; font-size: 0.85em; padding: 0 2px; opacity: 0.6; }
+        .plan-ban:hover { opacity: 1; }
     </style>
 </head>
 <body>
@@ -87,6 +103,65 @@
             return decimals > 0 ? num.toFixed(decimals) : Math.round(num);
         }
 
+        // ── Multi-week plan with lock / ban, saved per team ──
+        let planInputs = null;
+
+        function togglePlanPref(list, id) {
+            const prefs = FPL_API.getPlanPrefs();
+            prefs[list] = prefs[list].includes(id) ? prefs[list].filter(x => x !== id) : [...prefs[list], id];
+            FPL_API.savePlanPrefs(prefs);
+            renderPlan();
+        }
+
+        async function renderPlan() {
+            const el = document.getElementById('plan-section');
+            if (!el || !planInputs) return;
+            el.innerHTML = `<div class="loading">${t('loadingTransfers')}</div>`;
+            try {
+                const prefs = FPL_API.getPlanPrefs();
+                const plan = await Predictor.planTransfers(planInputs.picks, planInputs.allPlayers, planInputs.bank, prefs);
+                if (!plan.horizon.length) { el.innerHTML = ''; return; }
+                const range = `GW${plan.horizon[0].id}–${plan.horizon[plan.horizon.length - 1].id}`;
+                const byId = new Map(planInputs.allPlayers.map(p => [p.id, p]));
+
+                let html = `<div class="plan-header">
+                        <h3 style="margin:0;">${t('planTitle')} · ${range}</h3>
+                        <span class="plan-gain">+${safeNumber(plan.gain, 1)} pts ${t('planVsRoll')}</span>
+                    </div>
+                    <div class="plan-steps">`;
+                for (const step of plan.steps) {
+                    html += `<div class="plan-step${step.moves.length ? '' : ' roll'}">
+                        <div class="plan-step-gw"><span>GW${step.gw}</span><span>${step.freeTransfers} ${t('planFT')}${step.hit ? ` <span class="plan-hit">−${step.hit}</span>` : ''}</span></div>
+                        ${step.moves.length
+                            ? step.moves.map(m => `<div class="plan-move">${m.out.name} → <strong>${m.in.name}</strong> £${safeNumber(m.in.price, 1)}m
+                                <button class="plan-ban" title="${t('planBan')}" onclick="togglePlanPref('banned', ${m.in.id})">⛔</button></div>`).join('')
+                            : `<div class="plan-move">${t('planRoll')}</div>`}
+                        <div class="plan-meta">${t('planXI')} ${safeNumber(step.points, 1)} · ${t('planCaptain')} ${step.captain ? step.captain.name : '–'}</div>
+                    </div>`;
+                }
+                html += `</div>`;
+
+                html += `<div style="font-size:0.85em;">${t('planLockHint')}</div><div class="plan-chips">`;
+                for (const p of plan.squad) {
+                    const on = prefs.locked.includes(p.id);
+                    html += `<button class="plan-chip${on ? ' on' : ''}" onclick="togglePlanPref('locked', ${p.id})">${on ? '🔒 ' : ''}${p.name}</button>`;
+                }
+                html += `</div>`;
+                if (prefs.banned.length) {
+                    html += `<div style="font-size:0.85em;">${t('planBanned')}</div><div class="plan-chips">`;
+                    for (const id of prefs.banned) {
+                        const p = byId.get(id);
+                        html += `<button class="plan-chip on" onclick="togglePlanPref('banned', ${id})">⛔ ${p ? p.name : id} ✕</button>`;
+                    }
+                    html += `</div>`;
+                }
+                el.innerHTML = html;
+            } catch (error) {
+                el.innerHTML = `<div class="loading">${t('errorTransfers')}</div>`;
+                console.error(error);
+            }
+        }
+
         async function loadTransfers() {
             const content = document.getElementById('transfers-content');
 
@@ -98,6 +173,7 @@
                 content.innerHTML = `<div class="loading">${t('loadingTransfers')}</div>`;
 
                 const plan = await Predictor.getTransferPlan(teamData.picks, allPlayers, bank);
+                planInputs = { picks: teamData.picks, allPlayers, bank };
                 const transfers = plan.transfers;
                 const budget = plan.bank;
                 const horizon = plan.horizon.length ? `GW${plan.horizon[0].id}–${plan.horizon[plan.horizon.length - 1].id}` : '';
@@ -134,6 +210,10 @@
                             <div class="stat-card-label">${t('outfieldOptions')}</div>
                         </div>
                     </div>
+
+                    <div id="plan-section" class="tr-group" style="border-left: 6px solid var(--secondary-color);"></div>
+
+                    <h3 style="margin-top: 30px;">${t('singleTransfers')}</h3>
                 `;
 
                 if (transfers.length === 0) {
@@ -311,6 +391,7 @@
                 }
 
                 content.innerHTML = html;
+                renderPlan();
             } catch (error) {
                 content.innerHTML = `<div class="loading">${t('errorTransfers')}</div>`;
                 console.error(error);

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- PWA / Home screen icon -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <meta name="theme-color" content="#37003c">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="FPL Analyzer">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Fixture Analyser - FPL Analyzer</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="theme.js"></script>
+    <script src="lang.js"></script>
+    <style>
+        .container {
+            max-width: 1200px;
+        }
+        .card {
+            margin: 20px auto;
+            background: rgba(255, 255, 255, 0.98) !important;
+            border: 2px solid rgba(66, 181, 88, 0.3);
+        }
+        [data-theme="dark"] .card {
+            background: var(--bg-surface, #1a1030) !important;
+            border-color: var(--card-border, rgba(255,255,255,0.1));
+        }
+        .card-content {
+            max-height: none;
+        }
+        .fx-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+        .fx-btn { border: 1.5px solid var(--primary-color); background: transparent; color: var(--primary-color); border-radius: 16px; padding: 4px 12px; font-size: 0.85em; font-weight: 700; cursor: pointer; }
+        .fx-btn.on { background: var(--primary-color); color: #fff; }
+        [data-theme="dark"] .fx-btn { color: #fff; }
+        .fx-wrap { overflow-x: auto; }
+        /* Plain table: the global table styles are built for the wide, sticky player database */
+        .fx-table { width: 100%; min-width: 0; border-collapse: separate; border-spacing: 3px; font-size: 0.78em; }
+        .fx-table th, .fx-table td { position: static; white-space: nowrap; box-shadow: none; cursor: default; font-size: 1em; padding: 4px; border: none; }
+        .fx-table th { border-radius: 6px; }
+        .fx-table td.fx-team { background: transparent; text-align: left; font-weight: 800; color: inherit; }
+        .fx-table td.fx-team img { width: 18px; height: 18px; vertical-align: middle; margin-right: 4px; }
+        .fx-cell { border-radius: 6px; text-align: center; color: #1a1a1a; font-weight: 700; line-height: 1.25; }
+        .fx-cell small { display: block; font-weight: 600; opacity: 0.75; }
+        .fx-cell + .fx-cell { margin-top: 2px; }
+        .fx-blank { background: rgba(0,0,0,0.08); color: var(--text-muted, #666); border-radius: 6px; text-align: center; padding: 4px; }
+        .fx-sum { font-weight: 800; text-align: right; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <button class="back-btn" onclick="window.close()" title="Close" aria-label="Close">←</button>
+            <h1 data-i18n="cardFixtures">Fixture Analyser</h1>
+            <div class="lang-switcher">
+                <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English">🇬🇧</button>
+                <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski">🇷🇸</button>
+            </div>
+            <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">🌙</button>
+        </header>
+
+        <div class="card">
+            <div class="card-content" id="fixtures-content">
+                <div class="loading">Loading fixtures...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="fpl-api.js"></script>
+    <script src="prediction.js"></script>
+    <script>
+        let ticker = null;
+        let mode = 'attack';
+        let span = 5;
+
+        // Cell value per mode; higher is better for attack / defence, lower for FPL difficulty
+        const metric = {
+            attack:  { value: c => c.xgFor,  label: c => c.xgFor.toFixed(1), better: 'high', blank: 0 },
+            defence: { value: c => c.csProb, label: c => `${Math.round(c.csProb * 100)}%`, better: 'high', blank: 0 },
+            fdr:     { value: c => c.fdr,    label: c => c.fdr, better: 'low', blank: 5 }
+        };
+
+        // Green (good) to red (bad)
+        function colour(value, min, max, better) {
+            let x = max > min ? (value - min) / (max - min) : 0.5;
+            if (better === 'low') x = 1 - x;
+            return `hsl(${Math.round(x * 130)}, 70%, ${70 - Math.round(Math.abs(x - 0.5) * 16)}%)`;
+        }
+
+        function render() {
+            const content = document.getElementById('fixtures-content');
+            const m = metric[mode];
+            const all = ticker.teams.flatMap(r => r.cells.flat()).map(m.value);
+            const min = Math.min(...all);
+            const max = Math.max(...all);
+
+            // Sum over the chosen span: doubles add up, blanks count as nothing (or worst for FPL difficulty)
+            const sum = row => row.cells.slice(0, span).reduce((total, cell) =>
+                total + (cell.length ? cell.reduce((s, c) => s + m.value(c), 0) : m.blank), 0);
+            const rows = ticker.teams.slice().sort((a, b) => (m.better === 'high' ? sum(b) - sum(a) : sum(a) - sum(b)));
+
+            let html = `<div class="fx-controls">
+                    ${['attack', 'defence', 'fdr'].map(k => `<button class="fx-btn${mode === k ? ' on' : ''}" onclick="mode='${k}'; render()">${t({ attack: 'fxAttack', defence: 'fxDefence', fdr: 'fxFdr' }[k])}</button>`).join('')}
+                    <span style="margin-left:12px;">${t('fxSortNext')}</span>
+                    ${[3, 5, 8].filter(n => n <= ticker.events.length).map(n => `<button class="fx-btn${span === n ? ' on' : ''}" onclick="span=${n}; render()">${n} GW</button>`).join('')}
+                </div>
+                <div class="stats-info" style="font-size:0.84em; line-height:1.6; margin-bottom:12px;">${t('fxExplain')}</div>
+                <div class="fx-wrap"><table class="fx-table">
+                    <tr><th>${t('colTeam')}</th>${ticker.events.map((id, i) => `<th style="${i < span ? '' : 'opacity:0.55;'}">GW${id}</th>`).join('')}<th class="fx-sum">Σ ${span}</th></tr>`;
+            for (const row of rows) {
+                html += `<tr><td class="fx-team"><img src="https://resources.premierleague.com/premierleague/badges/50/t${row.team.code}.png" alt="" onerror="this.style.display='none'">${row.team.shortName}</td>`;
+                row.cells.forEach((cell, i) => {
+                    const faded = i < span ? '' : 'opacity:0.55;';
+                    html += `<td style="${faded}">${cell.length
+                        ? cell.map(c => `<div class="fx-cell" style="background:${colour(m.value(c), min, max, m.better)};">${c.opponent} (${c.isHome ? 'H' : 'A'})<small>${m.label(c)}</small></div>`).join('')
+                        : `<div class="fx-blank">${t('fxBlank')}</div>`}</td>`;
+                });
+                const total = sum(row);
+                html += `<td class="fx-sum">${mode === 'fdr' ? total : total.toFixed(1)}</td></tr>`;
+            }
+            html += `</table></div>`;
+            content.innerHTML = html;
+        }
+
+        async function loadFixtures() {
+            const content = document.getElementById('fixtures-content');
+            try {
+                ticker = await Predictor.getFixtureTicker(8);
+                if (!ticker.events.length) {
+                    content.innerHTML = `<div class="loading">${t('fxNone')}</div>`;
+                    return;
+                }
+                render();
+            } catch (error) {
+                content.innerHTML = `<div class="loading">${t('errorFixtures')}</div>`;
+                console.error(error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadFixtures);
+    </script>
+
+    <footer class="site-footer" data-i18n-html="footerHtml">
+        Made with <span class="heart">&#x2665;</span> for you by <strong>Srdjan Kojic</strong>
+    </footer>
+</body>
+</html>

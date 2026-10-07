@@ -120,9 +120,15 @@ const Predictor = {
         if (this.context) return this.context;
 
         const [bootstrap, fixtures] = await Promise.all([FPL_API.getBootstrapStatic(), FPL_API.getFixtures()]);
+        this.context = this.buildContext(bootstrap, fixtures);
+        return this.context;
+    },
 
+    // Context from raw bootstrap + fixtures. `nextEventId` overrides the next gameweek
+    // (the backtest rebuilds the season as it stood before a past gameweek).
+    buildContext(bootstrap, fixtures, nextEventId = null) {
         // Horizon: the next N gameweeks (transfers made now count from the next deadline)
-        const next = bootstrap.events.find(e => e.is_next);
+        const next = nextEventId ? bootstrap.events.find(e => e.id === nextEventId) : bootstrap.events.find(e => e.is_next);
         const horizon = next
             ? bootstrap.events
                 .filter(e => e.id >= next.id && e.id < next.id + this.HORIZON)
@@ -208,8 +214,7 @@ const Predictor = {
             };
         }
 
-        this.context = { bootstrap, horizon, fixturesByTeam, teamGames, teams, leagueAvg, positionRates };
-        return this.context;
+        return { bootstrap, horizon, fixturesByTeam, teamGames, teams, leagueAvg, positionRates };
     },
 
     // ── Minutes model ────────────────────────────────────────────────────────
@@ -509,6 +514,23 @@ const Predictor = {
         return { squad, bank: Math.round(bank * 10) / 10, sellingPrice, freeTransfers, pending, maxFree };
     },
 
+    // Best players to buy per position by projection (season minutes), affordable for at least one sale
+    buildShortlist(state, allPlayers, ctx, size, banned = new Set()) {
+        const squadIds = new Set(state.squad.map(p => p.id));
+        const shortlist = {};
+        for (const pos of ['GKP', 'DEF', 'MID', 'FWD']) {
+            const maxSell = Math.max(0, ...state.squad.filter(p => p.position === pos).map(p => state.sellingPrice[p.id]));
+            shortlist[pos] = allPlayers
+                .filter(p => p.position === pos && !squadIds.has(p.id) && !banned.has(p.id) && p.status !== 'u'
+                    && p.price <= state.bank + maxSell + 1e-9)
+                .map(p => this.projectPlayerSync(p, ctx))
+                .sort((a, b) => b.weighted - a.weighted)
+                .slice(0, size)
+                .map(pr => pr.player);
+        }
+        return shortlist;
+    },
+
     // ── Transfer suggestions ─────────────────────────────────────────────────
     // Every single transfer is scored by how much it changes the squad value over the horizon
     // (best XI + captain each gameweek), within budget and the 3-per-club limit.
@@ -518,22 +540,11 @@ const Predictor = {
         const plan = { ...state, horizon: ctx.horizon, transfers: [] };
         if (!ctx.horizon.length) return plan;
 
-        const squadIds = new Set(state.squad.map(p => p.id));
         const clubLimit = (ctx.bootstrap.game_settings || {}).squad_team_limit || 3;
         const clubCount = {};
         for (const p of state.squad) clubCount[p.teamId] = (clubCount[p.teamId] || 0) + 1;
 
-        // Shortlist per position by projection (season minutes), affordable for at least one sale
-        const shortlist = {};
-        for (const pos of ['GKP', 'DEF', 'MID', 'FWD']) {
-            const maxSell = Math.max(0, ...state.squad.filter(p => p.position === pos).map(p => state.sellingPrice[p.id]));
-            shortlist[pos] = allPlayers
-                .filter(p => p.position === pos && !squadIds.has(p.id) && p.status !== 'u' && p.price <= state.bank + maxSell + 1e-9)
-                .map(p => this.projectPlayerSync(p, ctx))
-                .sort((a, b) => b.weighted - a.weighted)
-                .slice(0, 8)
-                .map(pr => pr.player);
-        }
+        const shortlist = this.buildShortlist(state, allPlayers, ctx, 8);
 
         // Recent minutes for the squad and the shortlist, then project again with them
         await this.loadRecentHistory([...state.squad, ...Object.values(shortlist).flat()]);
@@ -590,6 +601,154 @@ const Predictor = {
         }
 
         return plan;
+    },
+
+    // ── Fixture ticker ───────────────────────────────────────────────────────
+    // Next `count` gameweeks per team: expected goals for (attack) and clean-sheet chance (defence)
+    // from the model's team ratings, plus FPL's own difficulty. Blank = no cell entries, double = two.
+    async getFixtureTicker(count = 8) {
+        const ctx = await this.getContext();
+        const fixtures = await FPL_API.getFixtures();
+        const next = ctx.bootstrap.events.find(e => e.is_next);
+        if (!next) return { events: [], teams: [] };
+        const events = ctx.bootstrap.events.filter(e => e.id >= next.id && e.id < next.id + count).map(e => e.id);
+
+        const rows = {};
+        for (const team of ctx.bootstrap.teams) {
+            rows[team.id] = { team: { id: team.id, shortName: team.short_name, name: team.name, code: team.code }, cells: events.map(() => []) };
+        }
+        for (const f of fixtures) {
+            const col = events.indexOf(f.event);
+            if (col < 0 || f.finished) continue;
+            for (const [teamId, oppId, isHome, fdr] of [[f.team_h, f.team_a, true, f.team_h_difficulty], [f.team_a, f.team_h, false, f.team_a_difficulty]]) {
+                const own = ctx.teams[teamId];
+                const opp = ctx.teams[oppId];
+                const home = isHome ? this.HOME_ADVANTAGE : 1 / this.HOME_ADVANTAGE;
+                rows[teamId].cells[col].push({
+                    opponent: opp.shortName,
+                    isHome,
+                    fdr,
+                    xgFor: ctx.leagueAvg * own.attack * opp.defence * home,
+                    csProb: Math.exp(-ctx.leagueAvg * opp.attack * own.defence / home)
+                });
+            }
+        }
+        return { events, leagueAvg: ctx.leagueAvg, teams: Object.values(rows) };
+    },
+
+    // ── Multi-week transfer planner ──────────────────────────────────────────
+    PLAN_BEAM: 12,          // plans kept after each gameweek
+    PLAN_SHORTLIST: 10,     // players considered per position
+    PLAN_PAIRS_FROM: 12,    // best single moves combined into two-transfer weeks
+    FT_VALUE: 2,            // points credited per free transfer still banked (keeps rolling an option)
+
+    // Search over the horizon: each gameweek roll, make one transfer or make two, paying hits beyond
+    // the free transfers. The best plans are kept after every gameweek (beam search).
+    // Locked players are never sold, banned players never bought. Prices are assumed not to change.
+    async planTransfers(currentTeam, allPlayers, bank, { locked = [], banned = [] } = {}) {
+        const ctx = await this.getContext();
+        const state = await this.getTransferState(currentTeam, allPlayers, bank, ctx);
+        const result = { ...state, horizon: ctx.horizon, steps: [], gain: 0 };
+        const H = ctx.horizon.length;
+        if (!H) return result;
+
+        const lockedIds = new Set(locked);
+        const shortlist = this.buildShortlist(state, allPlayers, ctx, this.PLAN_SHORTLIST, new Set(banned));
+        const pool = [...state.squad, ...Object.values(shortlist).flat()];
+        await this.loadRecentHistory(pool);
+        const proj = new Map(pool.map(p => [p.id, this.projectPlayerSync(p, ctx)]));
+
+        const clubLimit = (ctx.bootstrap.game_settings || {}).squad_team_limit || 3;
+        const weight = k => Math.pow(this.DECAY, k);
+        const lineup = (squad, k) => this.bestLineup(squad.map(p => proj.get(p.id)), k);
+        // Weighted points of gameweeks k.. if the squad is kept as it is
+        const holdFrom = (squad, k) => {
+            let value = 0;
+            for (let j = k; j < H; j++) value += weight(j) * lineup(squad, j).points;
+            return value;
+        };
+        const clubCounts = squad => squad.reduce((c, p) => ((c[p.teamId] = (c[p.teamId] || 0) + 1), c), {});
+
+        // Single transfers worth considering this gameweek, best first
+        const singleMoves = (st, k) => {
+            const ids = new Set(st.squad.map(p => p.id));
+            const clubs = clubCounts(st.squad);
+            const base = holdFrom(st.squad, k);
+            const moves = [];
+            st.squad.forEach((out, idx) => {
+                if (lockedIds.has(out.id)) return;
+                for (const candidate of shortlist[out.position]) {
+                    if (ids.has(candidate.id) || candidate.price > st.bank + st.sell[out.id] + 1e-9) continue;
+                    if (candidate.teamId !== out.teamId && (clubs[candidate.teamId] || 0) + 1 > clubLimit) continue;
+                    const squad = st.squad.slice();
+                    squad[idx] = candidate;
+                    const gain = holdFrom(squad, k) - base;
+                    if (gain > 0) moves.push({ out, in: candidate, gain });
+                }
+            });
+            return moves.sort((a, b) => b.gain - a.gain);
+        };
+
+        const applyMoves = (st, moves, k) => {
+            let squad = st.squad;
+            let bank = st.bank;
+            const sell = { ...st.sell };
+            for (const m of moves) {
+                squad = squad.map(p => (p.id === m.out.id ? m.in : p));
+                bank = Math.round((bank + sell[m.out.id] - m.in.price) * 10) / 10;
+                sell[m.in.id] = m.in.price;
+            }
+            const hit = Math.max(0, moves.length - st.ft) * this.HIT_COST;
+            const ft = Math.min(state.maxFree, Math.max(0, st.ft - moves.length) + 1);
+            const gw = lineup(squad, k);
+            const banked = st.banked + weight(k) * gw.points - hit;
+            return {
+                squad, bank, sell, ft, banked,
+                score: banked + holdFrom(squad, k + 1) + ft * this.FT_VALUE,
+                steps: [...st.steps, {
+                    gw: ctx.horizon[k].id, moves: moves.map(m => ({ out: m.out, in: m.in })), hit,
+                    freeTransfers: st.ft, points: Math.round(gw.points * 10) / 10,
+                    captain: gw.captain ? gw.captain.player : null
+                }]
+            };
+        };
+
+        let beam = [{ squad: state.squad, bank: state.bank, sell: { ...state.sellingPrice }, ft: state.freeTransfers, banked: 0, steps: [] }];
+        for (let k = 0; k < H; k++) {
+            const children = new Map();
+            const keep = child => {
+                const key = child.squad.map(p => p.id).sort((a, b) => a - b).join(',') + '|' + child.ft;
+                if (!children.has(key) || children.get(key).score < child.score) children.set(key, child);
+            };
+            for (const st of beam) {
+                keep(applyMoves(st, [], k));
+                const singles = singleMoves(st, k);
+                for (const m of singles) keep(applyMoves(st, [m], k));
+
+                // Two transfers in one week: combine the best singles that fit together
+                const top = singles.slice(0, this.PLAN_PAIRS_FROM);
+                for (let i = 0; i < top.length; i++) {
+                    for (let j = i + 1; j < top.length; j++) {
+                        const [a, b] = [top[i], top[j]];
+                        if (a.out.id === b.out.id || a.in.id === b.in.id) continue;
+                        if (st.bank + st.sell[a.out.id] + st.sell[b.out.id] - a.in.price - b.in.price < -1e-9) continue;
+                        const after = st.squad.map(p => (p.id === a.out.id ? a.in : p.id === b.out.id ? b.in : p));
+                        if (Math.max(...Object.values(clubCounts(after))) > clubLimit) continue;
+                        keep(applyMoves(st, [a, b], k));
+                    }
+                }
+            }
+            beam = [...children.values()].sort((a, b) => b.score - a.score).slice(0, this.PLAN_BEAM);
+        }
+
+        // Compare with rolling every week
+        const holdValue = holdFrom(state.squad, 0) + Math.min(state.maxFree, state.freeTransfers + H) * this.FT_VALUE;
+        const best = beam[0];
+        result.steps = best.steps;
+        result.gain = Math.round((best.score - holdValue) * 10) / 10;
+        result.finalBank = best.bank;
+        result.finalFreeTransfers = best.ft;
+        return result;
     },
 
     // Kept for callers that only need the list

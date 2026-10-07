@@ -2,7 +2,8 @@
   "name": "fpl-analyzer",
   "private": true,
   "scripts": {
-    "test": "node test-api.js"
+    "test": "node test-api.js",
+    "backtest": "node scripts/backtest.js"
   },
   "engines": {
     "node": "22.x"

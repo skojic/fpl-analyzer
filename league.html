@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- PWA / Home screen icon -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <meta name="theme-color" content="#37003c">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="FPL Analyzer">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Mini-League - FPL Analyzer</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="theme.js"></script>
+    <script src="lang.js"></script>
+    <style>
+        .container {
+            max-width: 1000px;
+        }
+        .card {
+            margin: 20px auto;
+            background: rgba(255, 255, 255, 0.98) !important;
+            border: 2px solid rgba(66, 181, 88, 0.3);
+        }
+        [data-theme="dark"] .card {
+            background: var(--bg-surface, #1a1030) !important;
+            border-color: var(--card-border, rgba(255,255,255,0.1));
+        }
+        .card-content {
+            max-height: none;
+        }
+        .lg-select { padding: 6px 10px; border-radius: 8px; font-size: 0.95em; }
+        .lg-meta { font-size: 0.8em; color: var(--text-muted, #666); margin: 6px 0 14px; }
+        /* Plain tables: the global table styles are built for the wide, sticky player database */
+        .lg-table { width: 100%; min-width: 0; border-collapse: collapse; font-size: 0.85em; margin-bottom: 22px; }
+        .lg-table th, .lg-table td { position: static; white-space: normal; box-shadow: none; cursor: default; font-size: 1em; text-align: left; }
+        .lg-table td:first-child { background: transparent; color: inherit; font-weight: 600; }
+        .lg-table th { text-align: left; padding: 6px 8px; background: var(--primary-color); color: #fff; font-weight: 700; }
+        .lg-table td { padding: 6px 8px; border-bottom: 1px solid rgba(0,0,0,0.08); }
+        [data-theme="dark"] .lg-table td { border-bottom-color: rgba(255,255,255,0.08); }
+        .lg-table .num { text-align: right; }
+        .lg-table tr.me td { background: rgba(0,255,135,0.14); font-weight: 700; }
+        .lg-neg { color: #e0004d; font-weight: 700; }
+        .lg-pos { color: #16a34a; font-weight: 700; }
+        .lg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+        @media (max-width: 768px) { .lg-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <button class="back-btn" onclick="window.close()" title="Close" aria-label="Close">←</button>
+            <h1 data-i18n="cardLeague">Mini-League</h1>
+            <div class="lang-switcher">
+                <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English">🇬🇧</button>
+                <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski">🇷🇸</button>
+            </div>
+            <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">🌙</button>
+        </header>
+
+        <div class="card">
+            <div class="card-content" id="league-content">
+                <div class="loading">Loading league...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="fpl-api.js"></script>
+    <script src="prediction.js"></script>
+    <script src="league.js"></script>
+    <script>
+        function safeNumber(value, decimals = 0, defaultValue = 0) {
+            const num = parseFloat(value);
+            if (isNaN(num)) {
+                return decimals > 0 ? defaultValue.toFixed(decimals) : defaultValue;
+            }
+            return decimals > 0 ? num.toFixed(decimals) : Math.round(num);
+        }
+
+        // Team, manager and league names are free text set by FPL users
+        const esc = text => String(text ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const pct = x => `${Math.round(x * 100)}%`;
+        const swing = x => `<span class="${x < 0 ? 'lg-neg' : 'lg-pos'}">${x > 0 ? '+' : ''}${safeNumber(x, 1)}</span>`;
+
+        function playerTable(rows, columns) {
+            const heads = { name: t('colName'), eo: 'EO', yours: t('leagueYours'), owned: t('colOwned'), captaincy: 'C%', xPts: 'xPts', swing: t('leagueSwing') };
+            const cells = {
+                name: r => `<a href="player.html?id=${r.player.id}" target="_blank">${r.player.name}</a> <span style="opacity:0.6;">${r.player.team}</span>`,
+                eo: r => pct(r.eo),
+                yours: r => (r.yours ? `×${r.yours}` : '–'),
+                owned: r => pct(r.ownership),
+                captaincy: r => pct(r.captaincy),
+                xPts: r => safeNumber(r.xPts, 1),
+                swing: r => swing(r.exposure)
+            };
+            return `<table class="lg-table"><tr>${columns.map(c => `<th class="${c === 'name' ? '' : 'num'}">${heads[c]}</th>`).join('')}</tr>
+                ${rows.map(r => `<tr>${columns.map(c => `<td class="${c === 'name' ? '' : 'num'}">${cells[c](r)}</td>`).join('')}</tr>`).join('')}
+            </table>`;
+        }
+
+        async function loadLeague() {
+            const content = document.getElementById('league-content');
+            content.innerHTML = `<div class="loading">${t('loadingLeague')}</div>`;
+
+            try {
+                const leagues = await League.getMyLeagues();
+                if (!leagues.length) {
+                    content.innerHTML = `<div class="loading">${t('leagueNone')}</div>`;
+                    return;
+                }
+                const wanted = parseInt(new URLSearchParams(location.search).get('id'), 10);
+                const leagueId = leagues.some(l => l.id === wanted) ? wanted : leagues[0].id;
+                const a = await League.analyze(leagueId);
+                const myTotal = a.me ? a.me.total : null;
+
+                let html = `<label>${t('leagueSelect')}:
+                        <select class="lg-select" onchange="location.search='?id='+this.value">
+                            ${leagues.map(l => `<option value="${l.id}" ${l.id === leagueId ? 'selected' : ''}>${esc(l.name)}${l.isPrivate ? '' : ` (${t('leagueTop50')})`}</option>`).join('')}
+                        </select>
+                    </label>
+                    <div class="lg-meta">${t('leagueBasedOn')} ${a.gameweek} · ${a.rivalsSampled} ${t('leagueSampled')}${a.hasMore ? ` · ${t('leagueTop50')}` : ''}${Object.keys(a.chips).length ? ` · ${t('leagueChips')}: ${Object.entries(a.chips).map(([c, n]) => `${c} ×${n}`).join(', ')}` : ''}</div>
+                    <div class="stats-info" style="font-size:0.84em; line-height:1.6; margin-bottom:18px;">${t('leagueExplain')}</div>`;
+
+                html += `<h3>${t('leagueStandings')}</h3>
+                    <table class="lg-table"><tr><th>${t('leagueRank')}</th><th>${t('colTeam')}</th><th>${t('leagueManager')}</th><th class="num">${t('leagueGW')}</th><th class="num">${t('leagueTotal')}</th><th class="num">${t('leagueGap')}</th></tr>
+                    ${a.standings.map(r => `<tr class="${r.entry === FPL_API.TEAM_ID ? 'me' : ''}">
+                        <td>${r.rank}</td><td>${esc(r.entry_name)}</td><td>${esc(r.player_name)}</td>
+                        <td class="num">${r.event_total}</td><td class="num">${r.total}</td>
+                        <td class="num">${myTotal === null || r.entry === FPL_API.TEAM_ID ? '–' : (r.total - myTotal > 0 ? '+' : '') + (r.total - myTotal)}</td>
+                    </tr>`).join('')}
+                    </table>`;
+
+                html += `<div class="lg-grid">
+                    <div><h3>${t('leagueThreats')}</h3>${playerTable(a.threats.slice(0, 10), ['name', 'eo', 'yours', 'xPts', 'swing'])}</div>
+                    <div><h3>${t('leagueDiffs')}</h3>${playerTable(a.differentials.slice(0, 10), ['name', 'eo', 'yours', 'xPts', 'swing'])}</div>
+                </div>`;
+                html += `<div class="lg-grid">
+                    <div><h3>${t('leagueCaptains')}</h3>${playerTable(a.captains, ['name', 'captaincy', 'eo', 'yours', 'xPts'])}</div>
+                    <div><h3>${t('leagueTemplate')}</h3>${playerTable(a.template, ['name', 'owned', 'eo', 'yours'])}</div>
+                </div>`;
+
+                content.innerHTML = html;
+            } catch (error) {
+                content.innerHTML = `<div class="loading">${t('errorLeague')}</div>`;
+                console.error(error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadLeague);
+    </script>
+
+    <footer class="site-footer" data-i18n-html="footerHtml">
+        Made with <span class="heart">&#x2665;</span> for you by <strong>Srdjan Kojic</strong>
+    </footer>
+</body>
+</html>

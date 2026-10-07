@@ -29,7 +29,9 @@ async function initializeApp() {
             loadPlayerDatabase(),
             loadPerformance(),
             loadPredictions(),
-            loadTransferSuggestions()
+            loadTransferSuggestions(),
+            loadLeagueCard(),
+            loadFixturesCard()
         ]);
     } catch (error) {
         console.error('Error initializing app:', error);
@@ -635,7 +637,10 @@ async function loadTransferSuggestions() {
 
         content.innerHTML = `<div class="loading">${t('loadingTransfers')}</div>`;
 
-        const plan = await Predictor.getTransferPlan(appData.myTeam, appData.allPlayers, bank);
+        const [plan, weekPlan] = await Promise.all([
+            Predictor.getTransferPlan(appData.myTeam, appData.allPlayers, bank),
+            Predictor.planTransfers(appData.myTeam, appData.allPlayers, bank, FPL_API.getPlanPrefs())
+        ]);
         const transfers = plan.transfers;
 
         if (transfers.length === 0) {
@@ -654,6 +659,16 @@ async function loadTransferSuggestions() {
             <span style="font-size:0.75em; color:var(--text-muted);">${t('budget')}: £${safeNumber(plan.bank, 1)}m · ${t('freeTransfers')}: ${plan.freeTransfers}</span>
         </div>
         <div style="font-size:0.7em; color:var(--text-muted); margin-bottom:8px;">${t('alternativesNote')}</div>`;
+
+        // Multi-week plan in one line: GW6 A → B · GW7 roll · ...
+        if (weekPlan.steps.length) {
+            const steps = weekPlan.steps.map(st => `<strong>GW${st.gw}</strong> ${st.moves.length
+                ? st.moves.map(m => `${m.out.name} → ${m.in.name}`).join(', ') + (st.hit ? ` <span style="color:#e0004d;">−${st.hit}</span>` : '')
+                : t('planRoll')}`).join(' · ');
+            html = `<div style="font-size:0.75em; padding:6px 8px; margin-bottom:8px; border-radius:8px; background:rgba(0,255,135,0.12); line-height:1.5;">
+                <strong>${t('planNext')} (+${safeNumber(weekPlan.gain, 1)} pts ${t('planVsRoll')}):</strong> ${steps}
+            </div>` + html;
+        }
 
         // Already sorted by projected gain
         for (const tr of transfers) {
@@ -692,6 +707,92 @@ async function loadTransferSuggestions() {
         content.innerHTML = html;
     } catch (error) {
         content.innerHTML = `<div class="loading">${t('errorTransfers')}</div>`;
+        console.error(error);
+    }
+}
+
+// Load Mini-League Card: your position and the biggest EO threats in your first private league
+async function loadLeagueCard() {
+    const content = document.getElementById('league-content');
+    if (!content) return;
+
+    try {
+        const leagues = await League.getMyLeagues();
+        if (!leagues.length) {
+            content.innerHTML = `<div class="loading">${t('leagueNone')}</div>`;
+            return;
+        }
+        const a = await League.analyze(leagues[0].id);
+        const esc = text => String(text ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const leader = a.standings[0];
+        const gap = a.me && leader && leader.entry !== a.me.entry ? a.me.total - leader.total : null;
+        const row = r => `
+            <div class="player-row">
+                <div class="player-info">
+                    <div class="player-name">${r.player.name}</div>
+                    <div class="player-meta">${r.player.team} • EO ${Math.round(r.eo * 100)}% • ${t('leagueYours')} ${r.yours ? `×${r.yours}` : '–'}</div>
+                </div>
+                <div class="player-stats">
+                    <div class="stat">
+                        <div class="stat-value" style="color:${r.exposure < 0 ? '#e0004d' : '#16a34a'};">${r.exposure > 0 ? '+' : ''}${safeNumber(r.exposure, 1)}</div>
+                        <div class="stat-label">${t('leagueSwing')}</div>
+                    </div>
+                </div>
+            </div>`;
+
+        let html = `<h4 style="margin:0 0 8px;">${esc(a.league.name)}</h4>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-card-value">${a.me ? a.me.rank : '–'} / ${a.standings.length}</div>
+                    <div class="stat-card-label">${t('leagueRank')}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-value">${gap === null ? '–' : gap}</div>
+                    <div class="stat-card-label">${t('leagueGap')}</div>
+                </div>
+            </div>`;
+        if (a.threats.length) {
+            html += `<h4 style="margin:14px 0 6px;">${t('leagueThreats')}</h4><div class="team-grid">${a.threats.slice(0, 3).map(row).join('')}</div>`;
+        }
+        if (a.differentials.length) {
+            html += `<h4 style="margin:14px 0 6px;">${t('leagueDiffs')}</h4><div class="team-grid">${a.differentials.slice(0, 2).map(row).join('')}</div>`;
+        }
+        content.innerHTML = html;
+    } catch (error) {
+        content.innerHTML = `<div class="loading">${t('errorLeague')}</div>`;
+        console.error(error);
+    }
+}
+
+// Load Fixture Analyser Card: best attacking and defensive runs over the next 5 gameweeks
+async function loadFixturesCard() {
+    const content = document.getElementById('fixtures-content');
+    if (!content) return;
+
+    try {
+        const ticker = await Predictor.getFixtureTicker(5);
+        if (!ticker.events.length) {
+            content.innerHTML = `<div class="loading">${t('fxNone')}</div>`;
+            return;
+        }
+        const total = (row, fn) => row.cells.reduce((sum, cell) => sum + cell.reduce((s, c) => s + fn(c), 0), 0);
+        const run = row => row.cells.map(cell => (cell.length ? cell.map(c => `${c.opponent}${c.isHome ? '' : '*'}`).join('+') : '–')).join(' ');
+        const list = (title, fn, fmt) => {
+            const best = ticker.teams.slice().sort((a, b) => total(b, fn) - total(a, fn)).slice(0, 5);
+            return `<h4 style="margin:10px 0 6px;">${title}</h4><div class="team-grid">${best.map(row => `
+                <div class="player-row">
+                    <div class="player-info">
+                        <div class="player-name">${row.team.shortName}</div>
+                        <div class="player-meta">${run(row)}</div>
+                    </div>
+                    <div class="player-stats"><div class="stat"><div class="stat-value">${fmt(total(row, fn))}</div></div></div>
+                </div>`).join('')}</div>`;
+        };
+        content.innerHTML = `<div style="font-size:0.75em; color:var(--text-muted);">GW${ticker.events[0]}–${ticker.events[ticker.events.length - 1]} · * = away</div>`
+            + list(t('fxBestAttack'), c => c.xgFor, v => `${v.toFixed(1)} xG`)
+            + list(t('fxBestDefence'), c => c.csProb, v => `${v.toFixed(1)} CS`);
+    } catch (error) {
+        content.innerHTML = `<div class="loading">${t('errorFixtures')}</div>`;
         console.error(error);
     }
 }
