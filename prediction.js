@@ -1,13 +1,13 @@
 // FPL Points Prediction and Transfer Suggestion Module
 const Predictor = {
-    // FPL Scoring Rules
+    // FPL Scoring Rules (2026/27, matches bootstrap-static game_config.scoring)
     SCORING_RULES: {
         // Minutes played
         minutesPlayed: { threshold: 60, points: 2, underThreshold: 1 },
 
         // Goals scored
         goals: {
-            GKP: 6,
+            GKP: 10,
             DEF: 6,
             MID: 5,
             FWD: 4
@@ -18,8 +18,8 @@ const Predictor = {
 
         // Clean sheets
         cleanSheets: {
-            GKP: 6,
-            DEF: 6,
+            GKP: 4,
+            DEF: 4,
             MID: 1,
             FWD: 0
         },
@@ -38,6 +38,21 @@ const Predictor = {
             other: 0
         },
 
+        // Defensive contribution: points once a player reaches the action threshold in a match
+        // (DEF: clearances, blocks, interceptions, tackles; MID/FWD: the same plus recoveries).
+        // Thresholds are not in the API.
+        defensiveContribution: {
+            GKP: 0,
+            DEF: 2,
+            MID: 2,
+            FWD: 2
+        },
+        defensiveContributionThreshold: {
+            DEF: 10,
+            MID: 12,
+            FWD: 12
+        },
+
         // Bonus points
         bonus: 1, // per bonus point
 
@@ -51,6 +66,38 @@ const Predictor = {
 
         // Own goals
         ownGoal: -2
+    },
+
+    // Chance of playing next round as 0..1. The API sends null when there is no flag,
+    // and 0 for injured / suspended / unavailable players.
+    getAvailability(player) {
+        const chance = player.chanceOfPlayingNextRound;
+        return chance === null || chance === undefined ? 1 : chance / 100;
+    },
+
+    // E[floor(X / n)] for X ~ Poisson(lambda): expected points from "1 per n" rules
+    // (saves per 3, goals conceded per 2)
+    expectedPerN(lambda, n) {
+        if (!(lambda > 0)) return 0;
+        let p = Math.exp(-lambda);
+        let expected = 0;
+        for (let k = 1; k <= 60; k++) {
+            p *= lambda / k;
+            expected += p * Math.floor(k / n);
+        }
+        return expected;
+    },
+
+    // P(X >= threshold) for X ~ Poisson(lambda)
+    probAtLeast(lambda, threshold) {
+        if (!(lambda > 0)) return 0;
+        let p = Math.exp(-lambda);
+        let below = p;
+        for (let k = 1; k < threshold; k++) {
+            p *= lambda / k;
+            below += p;
+        }
+        return Math.max(0, 1 - below);
     },
 
     // Calculate expected points for next fixture based on stats and FPL rules
@@ -69,12 +116,11 @@ const Predictor = {
         const gamesPlayed = minutes > 0 ? minutes / 90 : 1;
         const startProbability = gamesPlayed > 0 ? Math.min(starts / gamesPlayed, 1) : 0.7;
 
-        // Playing chance
-        const playingChance = player.chanceOfPlayingNextRound ?
-            (player.chanceOfPlayingNextRound / 100) * startProbability : startProbability;
+        // Playing chance. Everything below is points *if he plays*; it is scaled by this once at the end.
+        const playingChance = this.getAvailability(player) * startProbability;
 
         // Expect 2 points for playing (if > 60 mins) - FPL rule
-        expectedPoints += 2 * playingChance;
+        expectedPoints += 2;
 
         // Get form multiplier
         const form = safeValue(player.form, 3);
@@ -128,7 +174,7 @@ const Predictor = {
             // 5. Goals conceded penalty — harder fixtures raise xGC
             //    Expected GC = xGC adjusted inversely to CS probability
             const expectedGC = xGCPer90 * (1 / fdrMult);
-            const gcPenalty = Math.floor(expectedGC / 2) * (this.SCORING_RULES.goalsConceded[player.position] || 0);
+            const gcPenalty = this.expectedPerN(expectedGC, 2) * (this.SCORING_RULES.goalsConceded[player.position] || 0);
             expectedPoints += gcPenalty; // negative value
         }
 
@@ -155,8 +201,8 @@ const Predictor = {
             const savesPerGame = starts > 0 ? totalSaves / starts : safeValue(player.savesPer90, 0);
             // Harder fixtures → more saves expected
             const fdrSaveMult = { 1: 0.75, 2: 0.88, 3: 1.00, 4: 1.18, 5: 1.40 }[fixture.difficulty] || 1.0;
-            const expectedSaves = savesPerGame * fdrSaveMult * playingChance;
-            expectedPoints += Math.floor(expectedSaves / 3) * this.SCORING_RULES.saves.GKP;
+            const expectedSaves = savesPerGame * fdrSaveMult;
+            expectedPoints += this.expectedPerN(expectedSaves, 3) * this.SCORING_RULES.saves.GKP;
 
             // Penalty save probability (~3% chance of a penalty per game)
             const penaltiesSaved = safeValue(player.penaltiesSaved, 0);
@@ -176,6 +222,13 @@ const Predictor = {
             if (bpsPerGame > 30) expectedPoints += 1.2;
             else if (bpsPerGame > 22) expectedPoints += 0.6;
             else if (bpsPerGame > 15) expectedPoints += 0.2;
+        }
+
+        // ── Defensive contribution (DEF / MID / FWD) ─────────────────────────
+        const dcThreshold = this.SCORING_RULES.defensiveContributionThreshold[player.position];
+        if (dcThreshold) {
+            const dcPer90 = safeValue(player.defensiveContributionPer90, 0);
+            expectedPoints += this.probAtLeast(dcPer90, dcThreshold) * this.SCORING_RULES.defensiveContribution[player.position];
         }
 
         // Penalty taker bonus
@@ -268,6 +321,14 @@ const Predictor = {
         );
 
         return predictions;
+    },
+
+    // Expected points for the team: starting XI only, captain counted with his multiplier
+    teamExpectedTotal(predictions) {
+        return predictions.reduce((sum, p) => {
+            const multiplier = p.player.multiplier ?? 1;
+            return sum + (parseFloat(p.expectedPoints) || 0) * multiplier;
+        }, 0);
     },
 
     // Calculate comprehensive player score using extended statistics
@@ -536,7 +597,7 @@ const Predictor = {
         const reasons = [];
 
         const outForm = parseFloat(playerOut.form) || 0;
-        const outChance = parseFloat(playerOut.chanceOfPlayingNextRound) || 100;
+        const outChance = this.getAvailability(playerOut) * 100;
         const inForm = parseFloat(playerIn.form) || 0;
         const inSelectedBy = parseFloat(playerIn.selectedBy) || 0;
         const inPPG = parseFloat(playerIn.pointsPerGame) || 0;
@@ -672,3 +733,5 @@ const Predictor = {
         };
     }
 };
+
+if (typeof module !== 'undefined') module.exports = Predictor;

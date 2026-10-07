@@ -167,14 +167,15 @@ fpl-analyzer/
 
 ## FPL Scoring Rules (Used in Predictions)
 
-The prediction algorithm follows official FPL scoring:
+The prediction algorithm follows official FPL scoring (2026/27, as returned by the API's `game_config.scoring`):
 
 ### Minutes Played
 - 1 point for playing up to 60 minutes
 - 2 points for playing 60+ minutes
 
 ### Goals Scored
-- Goalkeeper/Defender: 6 points
+- Goalkeeper: 10 points
+- Defender: 6 points
 - Midfielder: 5 points
 - Forward: 4 points
 
@@ -195,12 +196,18 @@ The prediction algorithm follows official FPL scoring:
 - Own goal: -2 points
 - Goals conceded: -1 point per 2 goals (GKP/DEF only)
 
+### Defensive Contribution
+- Defender: 2 points for 10+ clearances, blocks, interceptions and tackles in a match
+- Midfielder / Forward: 2 points for 12+ of the same actions plus ball recoveries
+- Predicted from each player's defensive actions per 90
+
 ## Available Statistics
 
 ### ✅ Available in FPL API (Used by this app)
 - **Basic stats**: Goals, Assists, Clean Sheets, Saves, Minutes, Starts
 - **Expected stats**: xG, xA, xGI (Expected Goal Involvements), xGC (Expected Goals Conceded)
 - **Per 90 stats**: xG/90, xA/90, xGI/90, xGC/90, Saves/90
+- **Defensive actions**: Clearances/blocks/interceptions, tackles, recoveries, defensive contribution (total and per 90)
 - **Performance metrics**: Form, Points Per Game, Bonus Points earned
 - **Advanced metrics**: BPS (Bonus Points System score), ICT Index (Influence/Creativity/Threat)
 - **Availability**: Injury status, chance of playing, news updates
@@ -209,12 +216,11 @@ The prediction algorithm follows official FPL scoring:
 - **Other**: Own goals, penalties saved/missed
 
 ### ❌ NOT Available in Public FPL API
-- **Defensive actions**: Tackles, Interceptions, Clearances, Blocked shots
 - **Aerial duels**: Headers won/lost
 - **Passing stats**: Pass completion %, key passes
 - **Dribbling stats**: Successful dribbles, dispossessed
 
-**Note**: The unavailable stats (tackles, interceptions, headers) are Opta statistics used internally by FPL for BPS calculations but not exposed in the public API. Our BPS metric is a composite score that already factors in these defensive contributions.
+**Note**: The unavailable stats (headers, passing, dribbling) are Opta statistics used internally by FPL for BPS calculations but not exposed in the public API.
 
 ## Prediction Algorithm
 
@@ -276,7 +282,6 @@ If you want to pre-fill a Team ID for a specific deployment:
   - Player transfers between clubs
 - API rate limits may apply during heavy usage
 - Some features require active gameweeks
-- The FPL API does not expose granular defensive stats (tackles, interceptions) — the BPS metric is used as a composite proxy
 
 ## Future Enhancements
 

@@ -552,11 +552,8 @@ async function loadPredictions() {
 
         let html = `<h4>${t('nextGWPredictions')}</h4>`;
 
-        // Calculate total expected points
-        const totalExpected = predictions.reduce((sum, p) => {
-            const points = parseFloat(p.expectedPoints) || 0;
-            return sum + points;
-        }, 0);
+        // Expected points: starting XI, captain doubled
+        const totalExpected = Predictor.teamExpectedTotal(predictions);
 
         html += `
             <div class="stats-grid">

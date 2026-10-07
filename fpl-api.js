@@ -215,6 +215,8 @@ const FPL_API = {
             expectedGoalInvolvementsPer90: parseFloat(player.expected_goal_involvements_per_90),
             expectedGoalsConcededPer90: parseFloat(player.expected_goals_conceded_per_90),
             savesPer90: parseFloat(player.saves_per_90),
+            defensiveContribution: player.defensive_contribution,
+            defensiveContributionPer90: parseFloat(player.defensive_contribution_per_90),
 
             // Additional stats
             starts: player.starts,
