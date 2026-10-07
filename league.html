@@ -52,7 +52,7 @@
         function playerTable(rows, columns) {
             const heads = { name: t('colName'), eo: 'EO', yours: t('leagueYours'), owned: t('colOwned'), captaincy: 'C%', xPts: 'xPts', swing: t('leagueSwing') };
             const cells = {
-                name: r => `<a href="player.html?id=${r.player.id}" target="_blank">${r.player.name}</a> <span style="opacity:0.6;">${r.player.team}</span>`,
+                name: r => `<a href="player.html?id=${r.player.id}">${r.player.name}</a> <span style="opacity:0.6;">${r.player.team}</span>`,
                 eo: r => pct(r.eo),
                 yours: r => (r.yours ? `×${r.yours}` : '–'),
                 owned: r => pct(r.ownership),

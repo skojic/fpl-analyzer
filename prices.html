@@ -49,7 +49,7 @@
         // Full table for your squad; the side-by-side lists keep the essential columns
         function table(players, { sell = null, compact = false } = {}) {
             const cols = [
-                [t('colName'), p => `<a href="player.html?id=${p.id}" target="_blank">${p.name}</a> <span style="opacity:0.6;">${p.team}</span>`],
+                [t('colName'), p => `<a href="player.html?id=${p.id}">${p.name}</a> <span style="opacity:0.6;">${p.team}</span>`],
                 [t('colPrice'), p => `£${safeNumber(p.price, 1)}m`],
                 sell && [t('sellPrice'), p => `£${safeNumber(sell[p.id], 1)}m`],
                 !compact && [t('pcNow'), p => progress(p.priceChangePercent)],

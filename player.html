@@ -279,6 +279,11 @@
 
         /* ── Back button row ── */
         .pp-back { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+        /* The global header styles position these absolutely; here they sit in the row */
+        .pp-back .back-btn,
+        .pp-back .theme-toggle,
+        .pp-back .lang-switcher { position: static; }
+        .has-app-nav .pp-back .back-btn { display: inline-flex; margin-right: auto; width: auto; height: auto; border-radius: 8px; padding: 8px 16px; white-space: nowrap; }
         .back-btn {
             background: var(--card-bg);
             border: 1px solid var(--border-color);
@@ -327,8 +332,8 @@
     <div class="container" style="max-width:900px;">
 
         <div class="pp-back">
-            <button class="back-btn" onclick="window.close(); history.back();">← Back</button>
-            <div class="lang-switcher" style="position:static;display:inline-flex;vertical-align:middle;margin-right:6px;">
+            <button class="back-btn" type="button" onclick="history.length > 1 ? history.back() : UI.go('database.html')">← Back</button>
+            <div class="lang-switcher" style="display:inline-flex;">
                 <button class="lang-btn" data-lang="en" onclick="setLang('en')" title="English">🇬🇧</button>
                 <button class="lang-btn" data-lang="sr" onclick="setLang('sr')" title="Srpski">🇷🇸</button>
             </div>

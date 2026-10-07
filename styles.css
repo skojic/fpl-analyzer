@@ -334,31 +334,10 @@ header h1 {
     gap: 10px;
 }
 
-/* Add icons to card headers */
-.card[data-card="team"] .card-header h2::before {
-    content: '⚽';
-    font-size: 1.2em;
-}
 
-.card[data-card="performance"] .card-header h2::before {
-    content: '📊';
-    font-size: 1.2em;
-}
 
-.card[data-card="database"] .card-header h2::before {
-    content: '🗂️';
-    font-size: 1.2em;
-}
 
-.card[data-card="prediction"] .card-header h2::before {
-    content: '🔮';
-    font-size: 1.2em;
-}
 
-.card[data-card="transfers"] .card-header h2::before {
-    content: '🔄';
-    font-size: 1.2em;
-}
 
 .expand-btn {
     background: rgba(0, 255, 135, 0.15);

@@ -20,7 +20,6 @@
     <script src="theme.js"></script>
     <script src="lang.js"></script>
     <script src="ui.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
     <style>
         /* ═══════════════════════════════════════════════════════
            GUARDIAN OVERLAY — full-viewport onboarding screen
@@ -379,165 +378,104 @@
             <button id="change-team-btn" onclick="openChangeModal()" data-i18n="changeTeamId" title="Change FPL Team ID">Change ID</button>
         </header>
 
-        <div class="cards-grid">
-            <!-- My Team Card -->
-            <div class="card" data-card="team">
+        <div class="home-grid">
+            <div class="card home-card" data-card="live">
                 <div class="card-header">
-                    <h2 data-i18n="cardMyTeam">My Team</h2>
-                    <button class="expand-btn" onclick="openCardPage('team.html')">⤢</button>
-                </div>
-                <div class="card-content" id="team-content">
-                    <div class="loading" data-i18n="loadingTeam">Loading team data...</div>
-                </div>
-            </div>
-
-            <!-- Performance Analytics Card -->
-            <div class="card" data-card="performance">
-                <div class="card-header">
-                    <h2 data-i18n="cardPerformance">Performance Analytics</h2>
-                    <button class="expand-btn" onclick="openCardPage('performance.html')">⤢</button>
-                </div>
-                <div class="card-content" id="performance-content">
-                    <div class="loading" data-i18n="loadingPerf">Loading performance data...</div>
-                </div>
-            </div>
-
-            <!-- Player Database Card -->
-            <div class="card card-large" data-card="database">
-                <div class="card-header">
-                    <h2 data-i18n="cardDatabase">Player Database</h2>
-                    <button class="expand-btn" onclick="openCardPage('database.html')">⤢</button>
-                </div>
-                <div class="card-content" id="database-content">
-                    <div class="search-container">
-                        <input type="text" id="player-search" data-i18n="searchPlaceholder" data-i18n-attr="placeholder" placeholder="Search players by name, team, or position..." />
-                        <select id="position-filter">
-                            <option value="" data-i18n="allPositions">All Positions</option>
-                            <option value="GKP" data-i18n="goalkeeper">Goalkeeper</option>
-                            <option value="DEF" data-i18n="defender">Defender</option>
-                            <option value="MID" data-i18n="midfielder">Midfielder</option>
-                            <option value="FWD" data-i18n="forward">Forward</option>
-                        </select>
-                        <select id="team-filter">
-                            <option value="" data-i18n="allTeams">All Teams</option>
-                        </select>
+                    <h2><span class="card-icon" aria-hidden="true">🔴</span><span data-i18n="cardLive">Live Gameweek</span></h2>
+                    <div class="card-actions">
+                        <button class="ui-info" type="button" aria-label="How it works" aria-expanded="false" onclick="event.stopPropagation(); UI.toggleInfo(this, 'live')">i</button>
+                        <a class="card-open" href="live.html"><span data-i18n="guideOpen">Open</span> →</a>
                     </div>
-                    <div class="table-container">
-                        <table id="players-table" class="table-compact">
-                            <thead>
-                                <tr>
-                                    <th onclick="sortTable('name')" data-i18n="colName">Name ↕</th>
-                                    <th onclick="sortTable('team')" class="col-hide-sm" data-i18n="colTeam">Team ↕</th>
-                                    <th onclick="sortTable('position')" class="col-hide-sm" data-i18n="colPosition">Position ↕</th>
-                                    <th onclick="sortTable('price')" class="col-hide-sm" data-i18n="colPrice">Price ↕</th>
-                                    <th onclick="sortTable('points')" data-i18n="colPoints">Points ↕</th>
-                                    <th onclick="sortTable('form')" data-i18n="colForm">Form ↕</th>
-                                    <th onclick="sortTable('goalsScored')" class="col-hide-md" data-i18n="colGoals">Goals ↕</th>
-                                    <th onclick="sortTable('assists')" class="col-hide-md" data-i18n="colAssists">Assists ↕</th>
-                                    <th onclick="sortTable('expectedGoalInvolvements')" class="col-hide-lg" data-i18n="colXGI">Exp. G+A ↕</th>
-                                    <th onclick="sortTable('tackles')" class="col-hide-lg" data-i18n="colTackles">Tackles ↕</th>
-                                    <th onclick="sortTable('selectedBy')" class="col-hide-lg" data-i18n="colOwned">Owned By% ↕</th>
-                                </tr>
-                            </thead>
-                            <tbody id="players-tbody">
-                                <tr><td colspan="11" class="loading" data-i18n="loadingPlayers">Loading players...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Points Prediction Card -->
-            <div class="card" data-card="prediction">
-                <div class="card-header">
-                    <h2 data-i18n="cardPrediction">Points Prediction</h2>
-                    <button class="expand-btn" onclick="openCardPage('prediction.html')">⤢</button>
-                </div>
-                <div class="card-content" id="prediction-content">
-                    <div class="loading" data-i18n="loadingPredictions">Calculating predictions...</div>
-                </div>
-            </div>
-
-            <!-- Transfer Suggestions Card -->
-            <div class="card" data-card="transfers">
-                <div class="card-header">
-                    <h2 data-i18n="cardTransfers">Transfer Suggestions</h2>
-                    <button class="expand-btn" onclick="openCardPage('transfers.html')">⤢</button>
-                </div>
-                <div class="card-content" id="transfers-content">
-                    <div class="loading" data-i18n="loadingTransfers">Analyzing transfers...</div>
-                </div>
-            </div>
-            <!-- Mini-League Card -->
-            <div class="card" data-card="league">
-                <div class="card-header">
-                    <h2 data-i18n="cardLeague">Mini-League</h2>
-                    <button class="expand-btn" onclick="openCardPage('league.html')">⤢</button>
-                </div>
-                <div class="card-content" id="league-content">
-                    <div class="loading" data-i18n="loadingLeague">Loading league...</div>
-                </div>
-            </div>
-            <!-- Fixture Analyser Card -->
-            <div class="card" data-card="fixtures">
-                <div class="card-header">
-                    <h2 data-i18n="cardFixtures">Fixture Analyser</h2>
-                    <button class="expand-btn" onclick="openCardPage('fixtures.html')">⤢</button>
-                </div>
-                <div class="card-content" id="fixtures-content">
-                    <div class="loading" data-i18n="loadingFixtures">Loading fixtures...</div>
-                </div>
-            </div>
-            <!-- AI Team & Chips Card -->
-            <div class="card" data-card="optimizer">
-                <div class="card-header">
-                    <h2 data-i18n="cardOptimizer">AI Team & Chips</h2>
-                    <button class="expand-btn" onclick="openCardPage('optimizer.html')">⤢</button>
-                </div>
-                <div class="card-content" id="optimizer-content">
-                    <div class="loading" data-i18n="opLoading">Optimizing squads...</div>
-                </div>
-            </div>
-            <!-- Live Gameweek Card -->
-            <div class="card" data-card="live">
-                <div class="card-header">
-                    <h2 data-i18n="cardLive">Live Gameweek</h2>
-                    <button class="expand-btn" onclick="openCardPage('live.html')">⤢</button>
                 </div>
                 <div class="card-content" id="live-content">
-                    <div class="loading" data-i18n="loadingLive">Loading live points...</div>
+                    <div class="loading" data-i18n="loadingLive">Loading...</div>
                 </div>
             </div>
-            <!-- Price Changes Card -->
-            <div class="card" data-card="prices">
+            <div class="card home-card" data-card="team">
                 <div class="card-header">
-                    <h2 data-i18n="cardPrices">Price Changes</h2>
-                    <button class="expand-btn" onclick="openCardPage('prices.html')">⤢</button>
+                    <h2><span class="card-icon" aria-hidden="true">⚽</span><span data-i18n="cardMyTeam">My Team</span></h2>
+                    <div class="card-actions">
+                        <button class="ui-info" type="button" aria-label="How it works" aria-expanded="false" onclick="event.stopPropagation(); UI.toggleInfo(this, 'team')">i</button>
+                        <a class="card-open" href="team.html"><span data-i18n="guideOpen">Open</span> →</a>
+                    </div>
+                </div>
+                <div class="card-content" id="team-content">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+            <div class="card home-card" data-card="captain">
+                <div class="card-header">
+                    <h2><span class="card-icon" aria-hidden="true">🎯</span><span data-i18n="cardCaptain">Captain & Predictions</span></h2>
+                    <div class="card-actions">
+                        <button class="ui-info" type="button" aria-label="How it works" aria-expanded="false" onclick="event.stopPropagation(); UI.toggleInfo(this, 'prediction')">i</button>
+                        <a class="card-open" href="prediction.html"><span data-i18n="guideOpen">Open</span> →</a>
+                    </div>
+                </div>
+                <div class="card-content" id="prediction-content">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+            <div class="card home-card" data-card="plan">
+                <div class="card-header">
+                    <h2><span class="card-icon" aria-hidden="true">🗓️</span><span data-i18n="cardPlan">Transfer Plan</span></h2>
+                    <div class="card-actions">
+                        <button class="ui-info" type="button" aria-label="How it works" aria-expanded="false" onclick="event.stopPropagation(); UI.toggleInfo(this, 'transfers')">i</button>
+                        <a class="card-open" href="transfers.html"><span data-i18n="guideOpen">Open</span> →</a>
+                    </div>
+                </div>
+                <div class="card-content" id="transfers-content">
+                    <div class="loading" data-i18n="loadingTransfers">Loading...</div>
+                </div>
+            </div>
+            <div class="card home-card" data-card="league">
+                <div class="card-header">
+                    <h2><span class="card-icon" aria-hidden="true">🏆</span><span data-i18n="cardLeague">Mini-League</span></h2>
+                    <div class="card-actions">
+                        <button class="ui-info" type="button" aria-label="How it works" aria-expanded="false" onclick="event.stopPropagation(); UI.toggleInfo(this, 'league')">i</button>
+                        <a class="card-open" href="league.html"><span data-i18n="guideOpen">Open</span> →</a>
+                    </div>
+                </div>
+                <div class="card-content" id="league-content">
+                    <div class="loading" data-i18n="loadingLeague">Loading...</div>
+                </div>
+            </div>
+            <div class="card home-card" data-card="chips">
+                <div class="card-header">
+                    <h2><span class="card-icon" aria-hidden="true">🤖</span><span data-i18n="cardOptimizer">AI Team & Chips</span></h2>
+                    <div class="card-actions">
+                        <button class="ui-info" type="button" aria-label="How it works" aria-expanded="false" onclick="event.stopPropagation(); UI.toggleInfo(this, 'optimizer')">i</button>
+                        <a class="card-open" href="optimizer.html"><span data-i18n="guideOpen">Open</span> →</a>
+                    </div>
+                </div>
+                <div class="card-content" id="optimizer-content">
+                    <div class="loading" data-i18n="opLoading">Loading...</div>
+                </div>
+            </div>
+            <div class="card home-card" data-card="prices">
+                <div class="card-header">
+                    <h2><span class="card-icon" aria-hidden="true">💷</span><span data-i18n="cardPrices">Price Changes</span></h2>
+                    <div class="card-actions">
+                        <button class="ui-info" type="button" aria-label="How it works" aria-expanded="false" onclick="event.stopPropagation(); UI.toggleInfo(this, 'prices')">i</button>
+                        <a class="card-open" href="prices.html"><span data-i18n="guideOpen">Open</span> →</a>
+                    </div>
                 </div>
                 <div class="card-content" id="prices-content">
-                    <div class="loading" data-i18n="loadingPrices">Loading prices...</div>
+                    <div class="loading" data-i18n="loadingPrices">Loading...</div>
                 </div>
             </div>
-            <!-- Player Comparison Card -->
-            <div class="card" data-card="comparison">
+            <div class="card home-card" data-card="fixtures">
                 <div class="card-header">
-                    <h2 data-i18n="cardComparison">Player Comparison</h2>
-                    <button class="expand-btn" onclick="openCardPage('comparison.html')">&#10562;</button>
-                </div>
-                <div class="card-content" id="comparison-content">
-                    <div class="compare-search-row">
-                        <input type="text" class="compare-input" id="cmp-input-0" data-i18n="cmpPlayer1" data-i18n-attr="placeholder" placeholder="Player 1..." autocomplete="off" oninput="handleCompareSearch(0)" />
-                        <input type="text" class="compare-input" id="cmp-input-1" data-i18n="cmpPlayer2" data-i18n-attr="placeholder" placeholder="Player 2..." autocomplete="off" oninput="handleCompareSearch(1)" />
-                        <input type="text" class="compare-input" id="cmp-input-2" data-i18n="cmpPlayer3" data-i18n-attr="placeholder" placeholder="Player 3 (optional)" autocomplete="off" oninput="handleCompareSearch(2)" />
+                    <h2><span class="card-icon" aria-hidden="true">📅</span><span data-i18n="cardFixtures">Fixture Analyser</span></h2>
+                    <div class="card-actions">
+                        <button class="ui-info" type="button" aria-label="How it works" aria-expanded="false" onclick="event.stopPropagation(); UI.toggleInfo(this, 'fixtures')">i</button>
+                        <a class="card-open" href="fixtures.html"><span data-i18n="guideOpen">Open</span> →</a>
                     </div>
-                    <div id="cmp-dropdowns">
-                        <div class="cmp-dropdown" id="cmp-dd-0"></div>
-                        <div class="cmp-dropdown" id="cmp-dd-1"></div>
-                        <div class="cmp-dropdown" id="cmp-dd-2"></div>
-                    </div>
-                    <div id="cmp-result"><p class="cmp-hint" data-i18n="cmpHint">Search and select up to 3 players to compare their FPL stats.</p></div>
                 </div>
-            </div>        </div>
+                <div class="card-content" id="fixtures-content">
+                    <div class="loading" data-i18n="loadingFixtures">Loading...</div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <style>

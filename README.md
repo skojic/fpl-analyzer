@@ -137,27 +137,24 @@ Link to the APP: https://fpl-analyzer-eosin.vercel.app/
    - Find it at `fantasy.premierleague.com` → Points → the number in your URL
    - Your ID is saved in the browser; subsequent visits go straight to the dashboard
 
-3. **Navigate the Dashboard**
-   - The main page displays 6 cards in a responsive grid
-   - Each card shows a live summary of that section
+3. **Find your way around**
+   - The navigation bar has six tabs: **Home**, **My Team**, **Transfers**, **League**, **Players** and **Fixtures** (on phones it is a bar at the bottom of the screen)
+   - Tabs with several pages show them as buttons under the page header (e.g. Transfers → Transfer Plan / AI Team & Chips)
+   - Pages open in the same tab, so the browser's Back button works
 
-4. **Expand Cards**
-   - Click the expand button (⤢) in the top-right of any card
-   - Opens that section in a full-page view with complete details
+4. **Home overview**
+   - Eight summary cards in priority order: Live Gameweek, My Team, Captain & Predictions, Transfer Plan, Mini-League, AI Team & Chips, Price Changes, Fixture Analyser
+   - **Open →** on a card goes to its full page
 
-5. **Search Players**
-   - Use the Player Database card to search and filter
-   - Click column headers to sort
-   - Use filters for position and team
+5. **Explanations**
+   - **ⓘ** on a card, or **How this page works** under a page header, explains what it shows and how it is calculated
+   - **Guide** in the navigation bar lists every card and page with the same explanations
 
-6. **Compare Players**
-   - Use the Player Comparison card to search and select up to 3 players
-   - Stat bars highlight the leader in each category
+6. **Players**
+   - The Players tab has the database (search, filter, sort), the comparison of up to 3 players and price changes; click a player for the full profile
 
-7. **Get Transfer Suggestions**
-   - View AI-generated transfer recommendations
-   - See expected points gain for next 5 gameweeks
-   - Compare fixtures between incoming and outgoing players
+7. **Transfers**
+   - The plan suggests transfers for the next 5 gameweeks; lock players you want to keep and ban players you never want to buy
 
 8. **Switch Team / Language / Theme**
    - Use **Change ID** in the header to analyse a different team
@@ -168,7 +165,9 @@ Link to the APP: https://fpl-analyzer-eosin.vercel.app/
 
 ```
 fpl-analyzer/
-├── index.html              # Main dashboard — 6-card grid + Guardian onboarding
+├── index.html              # Home overview (8 summary cards) + Guardian onboarding
+├── components.css          # Shared components: page layout, tables, chips, navigation, guide
+├── ui.js                   # Shared helpers: formatting, widgets, pitch player, navigation, guide
 ├── styles.css              # All CSS styling (dark/light themes, responsive)
 ├── app.js                  # Main application logic
 ├── fpl-api.js              # FPL API integration & caching

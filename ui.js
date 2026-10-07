@@ -36,6 +36,26 @@ const UI = {
         return `<span class="ui-progress">${bar}</span><span class="${p >= 0 ? 'ui-up' : 'ui-down'}">${p > 0 ? '+' : ''}${safeNumber(percent, 0)}%</span>`;
     },
 
+    // Row of stat tiles: [[value, label], ...]
+    stats(tiles) {
+        return `<div class="stats-grid ui-stats">${tiles.map(([value, label]) =>
+            `<div class="stat-card"><div class="stat-card-value">${value}</div><div class="stat-card-label">${label}</div></div>`).join('')}</div>`;
+    },
+
+    // One list line: title and detail on the left, a value on the right ('up' / 'down' colours it)
+    row({ title, meta = '', value = '', label = '', tone = '', href = null }) {
+        const link = href ? ` row-link" role="link" tabindex="0" onclick="UI.go('${href}')" onkeydown="if(event.key==='Enter')UI.go('${href}')` : '';
+        return `<div class="player-row${link}">
+            <div class="player-info"><div class="player-name">${title}</div>${meta ? `<div class="player-meta">${meta}</div>` : ''}</div>
+            ${value !== '' ? `<div class="player-stats"><div class="stat"><div class="stat-value${tone ? ` ui-${tone}` : ''}">${value}</div>${label ? `<div class="stat-label">${label}</div>` : ''}</div></div>` : ''}
+        </div>`;
+    },
+
+    // Small heading inside a card
+    subtitle(text) {
+        return `<h4 class="card-subtitle">${text}</h4>`;
+    },
+
     // Next fixture per team for the pitch: teamId -> [{ opp, oppCode, isHome, diff }]
     nextFixtureMap(bootstrap, fixtures) {
         const map = {};
@@ -69,7 +89,7 @@ const UI = {
         }).join('');
 
         return `
-            <div class="field-player player-clickable" onclick="window.open('player.html?id=${player.id}','_blank')" title="View ${player.name} profile">
+            <div class="field-player player-clickable" onclick="UI.go('player.html?id=${player.id}')" title="View ${player.name} profile">
                 <div class="player-shirt-box${avail ? ` flag-${avail.level}` : ''}">
                     <div class="player-shirt ${captainClass}">${kitImg}</div>
                     <div class="player-name-field">${player.name}</div>
@@ -81,5 +101,151 @@ const UI = {
         `;
     }
 };
+
+// ── App navigation: tabs on top (bottom bar on phones), sub-pages as pills, same-tab links ──
+UI.TABS = [
+    { key: 'home', icon: '🏠', label: 'navHome', pages: [['index.html', 'navHome']] },
+    { key: 'team', icon: '⚽', label: 'navTeam', pages: [['team.html', 'cardMyTeam'], ['prediction.html', 'cardPrediction']] },
+    { key: 'transfers', icon: '🔄', label: 'navTransfers', pages: [['transfers.html', 'cardTransfers'], ['optimizer.html', 'cardOptimizer']] },
+    { key: 'league', icon: '🏆', label: 'navLeague', pages: [['league.html', 'cardLeague'], ['live.html', 'cardLive'], ['performance.html', 'cardPerformance']] },
+    { key: 'players', icon: '🗂️', label: 'navPlayers', pages: [['database.html', 'cardDatabase'], ['comparison.html', 'cardComparison'], ['prices.html', 'cardPrices'], ['player.html', null]] },
+    { key: 'fixtures', icon: '📅', label: 'navFixtures', pages: [['fixtures.html', 'cardFixtures']] }
+];
+
+UI.currentPage = function () {
+    const file = (typeof location !== 'undefined' ? location.pathname.split('/').pop() : '') || 'index.html';
+    return file.endsWith('.html') ? file : 'index.html';
+};
+
+UI.renderNav = function () {
+    if (document.querySelector('.app-nav')) return;
+    const page = UI.currentPage();
+    const active = UI.TABS.find(tab => tab.pages.some(([file]) => file === page)) || UI.TABS[0];
+
+    const nav = document.createElement('nav');
+    nav.className = 'app-nav';
+    nav.setAttribute('aria-label', 'Main');
+    nav.innerHTML = `
+        <a class="app-nav-brand" href="index.html">FPL Analyzer</a>
+        <div class="app-nav-tabs">
+            ${UI.TABS.map(tab => `<a class="app-nav-tab${tab === active ? ' active' : ''}" href="${tab.pages[0][0]}"${tab === active ? ' aria-current="page"' : ''}>
+                <span class="app-nav-icon" aria-hidden="true">${tab.icon}</span><span class="app-nav-label" data-i18n="${tab.label}">${t(tab.label)}</span></a>`).join('')}
+        </div>
+        <button class="app-nav-guide" type="button" onclick="UI.openGuide()" aria-label="${t('navGuide')}">
+            <span aria-hidden="true">?</span><span class="app-nav-label" data-i18n="navGuide">${t('navGuide')}</span>
+        </button>`;
+    document.body.insertBefore(nav, document.body.firstChild);
+    document.body.classList.add('has-app-nav');
+
+    // Under the page header: sub-pages of the active tab and "How this page works"
+    const subPages = active.pages.filter(([, label]) => label);
+    const guide = UI.GUIDE.find(([, , file]) => file === page);
+    const header = document.querySelector('.container > header');
+    if (header && (subPages.length > 1 || guide)) {
+        const sub = document.createElement('div');
+        sub.className = 'app-subnav';
+        sub.innerHTML = (subPages.length > 1 ? subPages.map(([file, label]) =>
+            `<a class="ui-chip${file === page ? ' on' : ''}" href="${file}"${file === page ? ' aria-current="page"' : ''} data-i18n="${label}">${t(label)}</a>`).join('') : '')
+            + (guide ? `<button class="ui-chip app-subnav-info" type="button" aria-expanded="false" onclick="event.stopPropagation(); UI.toggleInfo(this, '${guide[0]}')">
+                <span class="ui-info" aria-hidden="true">i</span> <span data-i18n="guideHowPage">${t('guideHowPage')}</span></button>` : '');
+        header.insertAdjacentElement('afterend', sub);
+    }
+};
+
+// ── Guide: what each card / page shows and how it works ─────────────────────
+// key -> [title key, page]; texts are guide_<key>_what / guide_<key>_how in lang.js
+UI.GUIDE = [
+    ['live', 'cardLive', 'live.html'],
+    ['team', 'cardMyTeam', 'team.html'],
+    ['prediction', 'cardPrediction', 'prediction.html'],
+    ['transfers', 'cardTransfers', 'transfers.html'],
+    ['optimizer', 'cardOptimizer', 'optimizer.html'],
+    ['league', 'cardLeague', 'league.html'],
+    ['performance', 'cardPerformance', 'performance.html'],
+    ['prices', 'cardPrices', 'prices.html'],
+    ['fixtures', 'cardFixtures', 'fixtures.html'],
+    ['database', 'cardDatabase', 'database.html'],
+    ['comparison', 'cardComparison', 'comparison.html'],
+    ['player', 'guidePlayerTitle', 'player.html']
+];
+
+UI.guideText = function (key) {
+    return `<p><strong>${t('guideWhat')}:</strong> ${t(`guide_${key}_what`)}</p><p><strong>${t('guideHow')}:</strong> ${t(`guide_${key}_how`)}</p>`;
+};
+
+// ⓘ button that opens a short explanation next to it
+UI.infoButton = function (key) {
+    return `<button class="ui-info" type="button" aria-label="${t('guideHow')}" aria-expanded="false" onclick="event.stopPropagation(); UI.toggleInfo(this, '${key}')">i</button>`;
+};
+
+UI.closeInfo = function () {
+    document.querySelectorAll('.ui-popover').forEach(el => el.remove());
+    document.querySelectorAll('.ui-info[aria-expanded="true"]').forEach(el => el.setAttribute('aria-expanded', 'false'));
+};
+
+UI.toggleInfo = function (button, key) {
+    const open = button.getAttribute('aria-expanded') === 'true';
+    UI.closeInfo();
+    if (open) return;
+    const pop = document.createElement('div');
+    pop.className = 'ui-popover';
+    pop.setAttribute('role', 'dialog');
+    pop.innerHTML = UI.guideText(key);
+    document.body.appendChild(pop);
+    const r = button.getBoundingClientRect();
+    const width = Math.min(340, window.innerWidth - 24);
+    pop.style.width = `${width}px`;
+    pop.style.left = `${Math.max(12, Math.min(window.innerWidth - width - 12, r.left + r.width / 2 - width / 2)) + window.scrollX}px`;
+    pop.style.top = `${r.bottom + 8 + window.scrollY}px`;
+    button.setAttribute('aria-expanded', 'true');
+};
+
+// The whole guide in one dialog, opened from the navigation bar
+UI.openGuide = function () {
+    UI.closeInfo();
+    let overlay = document.getElementById('ui-guide');
+    if (overlay) overlay.remove();
+    overlay = document.createElement('div');
+    overlay.id = 'ui-guide';
+    overlay.className = 'ui-modal';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.innerHTML = `<div class="ui-modal-box">
+            <div class="ui-modal-head"><h2>${t('guideTitle')}</h2>
+                <button class="ui-modal-close" type="button" onclick="UI.closeGuide()" aria-label="${t('guideClose')}">×</button></div>
+            <p class="ui-meta">${t('guideIntro')}</p>
+            ${UI.GUIDE.map(([key, title, page]) => `<section class="ui-guide-item">
+                <h3>${t(title)}${page !== 'player.html' ? ` <a href="${page}">${t('guideOpen')} →</a>` : ''}</h3>
+                ${UI.guideText(key)}
+            </section>`).join('')}
+        </div>`;
+    overlay.addEventListener('click', e => { if (e.target === overlay) UI.closeGuide(); });
+    document.body.appendChild(overlay);
+    overlay.querySelector('.ui-modal-close').focus();
+};
+
+UI.closeGuide = function () {
+    const overlay = document.getElementById('ui-guide');
+    if (overlay) overlay.remove();
+};
+
+
+// Same-tab navigation (the browser's Back button keeps working)
+UI.go = function (href) {
+    location.href = href;
+};
+
+if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+        UI.renderNav();
+    });
+    document.addEventListener('click', e => { if (!e.target.closest('.ui-popover')) UI.closeInfo(); });
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') {
+            UI.closeInfo();
+            UI.closeGuide();
+        }
+    });
+}
 
 if (typeof module !== 'undefined') module.exports = UI;
