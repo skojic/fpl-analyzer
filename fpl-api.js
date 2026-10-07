@@ -123,6 +123,23 @@ const FPL_API = {
         }
     },
 
+    // Transfers you've made in the FPL app for the next deadline. FPL only publishes transfers after the
+    // deadline, so until then they're entered here: { event, transfers: [{ out, in }] }, per team
+    getManualTransfers() {
+        try {
+            const data = JSON.parse(localStorage.getItem(`fpl_manual_transfers_${this.TEAM_ID}`) || 'null');
+            return data && Array.isArray(data.transfers) ? data : { event: null, transfers: [] };
+        } catch (e) {
+            return { event: null, transfers: [] };
+        }
+    },
+
+    saveManualTransfers(data) {
+        const key = `fpl_manual_transfers_${this.TEAM_ID}`;
+        if (!data || !data.transfers.length) localStorage.removeItem(key);
+        else localStorage.setItem(key, JSON.stringify(data));
+    },
+
     savePlanPrefs(prefs) {
         localStorage.setItem(`fpl_plan_prefs_${this.TEAM_ID}`, JSON.stringify(prefs));
     },

@@ -370,3 +370,6 @@ body:not(.page) .container > header .header-eyebrow { margin-bottom: 4px; }
 
 /* Team ID errors on the first-visit screen and in Change ID */
 .team-id-error { min-height: 1.2em; margin: 6px 0 0; font-size: var(--fs-sm); color: #ff8fb1; font-weight: 700; }
+
+/* Note about transfers you entered yourself */
+.ui-manual { color: var(--warning); font-weight: 700; }

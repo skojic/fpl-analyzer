@@ -120,6 +120,13 @@ const UI = {
         return `${t('nxFavBooks')}: <strong>${pick} ${Math.round(prob * 100)}%</strong>`;
     },
 
+    // Note that your entered (not yet published) transfers are included
+    manualNote(manual, gameweek) {
+        return manual && manual.length
+            ? `<div class="ui-meta ui-manual">✎ ${t('mtBanner').replace('{n}', manual.length).replace('{gw}', gameweek)}: ${manual.map(m => `${UI.esc(m.out.name)} → ${UI.esc(m.in.name)}`).join(', ')}</div>`
+            : '';
+    },
+
     // Small heading inside a card
     subtitle(text) {
         return `<h4 class="card-subtitle">${text}</h4>`;

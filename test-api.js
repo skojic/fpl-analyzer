@@ -344,6 +344,43 @@ const tests = [
         if (Math.abs(even.home - even.away) > 1e-9 || strong.home < 0.7) throw new Error('outcome probabilities off');
         return `GW${r.gameweek}: ${r.matches.length} matches, ${r.matches.filter(m => m.bookmakers).length} with odds`;
     }],
+    ['Transfers: entered transfers are applied until FPL publishes them', async () => {
+        const team = await FPL_API.getTeamComposition();
+        const players = await FPL_API.getAllPlayers();
+        const ctx = await Predictor.getContext();
+        const next = ctx.horizon[0].id;
+        const bank = team.entryHistory.bank / 10;
+        const before = await Predictor.getTransferState(team.picks, players, bank, ctx);
+        // Sell the cheapest midfielder for the cheapest affordable midfielder from another club we have < 3 of
+        const out = before.squad.filter(p => p.position === 'MID').sort((a, b) => a.price - b.price)[0];
+        const owned = new Set(before.squad.map(p => p.id));
+        const incoming = players.filter(p => p.position === 'MID' && !owned.has(p.id) && p.price <= before.bank + before.sellingPrice[out.id])
+            .sort((a, b) => b.price - a.price)[0];
+        await Predictor.loadRecentHistory([incoming]); // fetched now: the stand-in below can't reach the proxy
+        // Stand in for the browser storage
+        let stored = { event: next, transfers: [{ out: out.id, in: incoming.id }] };
+        const saved = [FPL_API.IS_BROWSER, FPL_API.getManualTransfers, FPL_API.saveManualTransfers];
+        FPL_API.IS_BROWSER = true;
+        FPL_API.getManualTransfers = () => stored;
+        FPL_API.saveManualTransfers = data => { stored = data; };
+        try {
+            const after = await Predictor.getTransferState(team.picks, players, bank, ctx);
+            if (after.squad.some(p => p.id === out.id) || !after.squad.some(p => p.id === incoming.id)) throw new Error('transfer not applied');
+            const expectedBank = Math.round((before.bank + before.sellingPrice[out.id] - incoming.price) * 10) / 10;
+            if (Math.abs(after.bank - expectedBank) > 1e-9) throw new Error(`bank ${after.bank}, expected ${expectedBank}`);
+            if (after.freeTransfers !== Math.max(0, before.freeTransfers - 1)) throw new Error('free transfers not used');
+            if (after.sellingPrice[incoming.id] !== incoming.price) throw new Error('a new player sells at his price');
+            const lineup = await Predictor.suggestLineup(team.picks, players, bank);
+            if (![...lineup.xi, ...lineup.bench].some(p => p.id === incoming.id)) throw new Error('lineup ignores the transfer');
+            // A transfer saved for a past deadline is dropped and cleared
+            stored = { event: next - 1, transfers: [{ out: out.id, in: incoming.id }] };
+            const stale = await Predictor.getTransferState(team.picks, players, bank, ctx);
+            if (stale.squad.some(p => p.id === incoming.id) || stored.transfers.length) throw new Error('stale transfer not cleared');
+            return `${out.name} -> ${incoming.name}: bank £${before.bank}m -> £${after.bank}m, FT ${before.freeTransfers} -> ${after.freeTransfers}`;
+        } finally {
+            [FPL_API.IS_BROWSER, FPL_API.getManualTransfers, FPL_API.saveManualTransfers] = saved;
+        }
+    }],
     ['Model: return date parsing', async () => {
         const d = Predictor.parseReturnDate('Hamstring injury - Expected back 18 Oct');
         if (!d || d.getUTCDate() !== 18 || d.getUTCMonth() !== 9) throw new Error(`got ${d}`);

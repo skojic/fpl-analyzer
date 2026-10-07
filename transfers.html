@@ -53,6 +53,9 @@
         .plan-meta { margin-top: 6px; font-size: 0.85em; color: var(--text-muted, #666); }
         .plan-ban { border: none; background: none; cursor: pointer; font-size: 0.85em; padding: 0 2px; opacity: 0.6; }
         .plan-ban:hover { opacity: 1; }
+        .mt-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-top: 12px; }
+        .mt-form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85em; font-weight: 700; }
+        .mt-form select { padding: 6px 8px; border-radius: 8px; min-width: 220px; max-width: 100%; }
     </style>
 </head>
 <body class="page">
@@ -137,6 +140,77 @@
             }
         }
 
+        // ── Transfers you've made in FPL that FPL doesn't publish until the deadline ──
+        let manualState = null;
+
+        function manualSection(plan, allPlayers) {
+            const next = plan.horizon[0];
+            if (!next) return '';
+            manualState = { plan, allPlayers, event: next.id };
+            const list = plan.manual.length
+                ? plan.manual.map((m, i) => UI.row({
+                    title: `${UI.esc(m.out.name)} → <strong>${UI.esc(m.in.name)}</strong>`,
+                    meta: `${m.in.team} • £${safeNumber(m.in.price, 1)}m`,
+                    value: `<button class="ui-chip" type="button" onclick="removeManual(${i})">${t('mtRemove')}</button>`
+                })).join('')
+                : `<div class="ui-meta">${t('mtNone')}</div>`;
+            const squadOptions = plan.squad.slice().sort((a, b) => 'GKPDEFMIDFWD'.indexOf(a.position) - 'GKPDEFMIDFWD'.indexOf(b.position) || a.name.localeCompare(b.name))
+                .map(p => `<option value="${p.id}">${UI.esc(p.name)} (${p.position}, ${p.team})</option>`).join('');
+            return `<div class="tr-group mt-box" style="border-left: 6px solid var(--warning);">
+                <h3 style="margin:0;">${t('mtTitle')} · GW${next.id}</h3>
+                <div class="ui-meta">${t('mtExplain')}</div>
+                ${list}
+                <div class="mt-form">
+                    <label>${t('transferOut')} <select id="mt-out" onchange="fillManualIn()"><option value="">–</option>${squadOptions}</select></label>
+                    <label>${t('transferIn')} <select id="mt-in" disabled><option value="">–</option></select></label>
+                    <button class="ui-chip on" type="button" onclick="addManual()">${t('mtAdd')}</button>
+                </div>
+                <div id="mt-error" class="ui-meta ui-down" role="alert"></div>
+            </div>`;
+        }
+
+        // Players you could bring in for the selected one: same position, not in your squad, by price
+        function fillManualIn() {
+            const outId = parseInt(document.getElementById('mt-out').value, 10);
+            const select = document.getElementById('mt-in');
+            const out = manualState.plan.squad.find(p => p.id === outId);
+            if (!out) { select.innerHTML = '<option value="">–</option>'; select.disabled = true; return; }
+            const owned = new Set(manualState.plan.squad.map(p => p.id));
+            select.innerHTML = '<option value="">–</option>' + manualState.allPlayers
+                .filter(p => p.position === out.position && !owned.has(p.id) && p.status !== 'u')
+                .sort((a, b) => b.price - a.price || a.name.localeCompare(b.name))
+                .map(p => `<option value="${p.id}">${UI.esc(p.name)} (${p.team}) £${safeNumber(p.price, 1)}m</option>`).join('');
+            select.disabled = false;
+        }
+
+        function addManual() {
+            const error = document.getElementById('mt-error');
+            const outId = parseInt(document.getElementById('mt-out').value, 10);
+            const inId = parseInt(document.getElementById('mt-in').value, 10);
+            const { plan, allPlayers, event } = manualState;
+            const out = plan.squad.find(p => p.id === outId);
+            const incoming = allPlayers.find(p => p.id === inId);
+            if (!out || !incoming) { error.textContent = t('mtPick'); return; }
+            // Budget and the 3-per-club limit after this transfer
+            if (incoming.price > plan.bank + plan.sellingPrice[out.id] + 1e-9) {
+                error.textContent = t('mtBudget').replace('{need}', safeNumber(incoming.price - plan.sellingPrice[out.id] - plan.bank, 1));
+                return;
+            }
+            const clubs = plan.squad.filter(p => p.id !== out.id && p.teamId === incoming.teamId).length;
+            if (clubs >= 3) { error.textContent = t('mtClub').replace('{team}', incoming.team); return; }
+            const data = FPL_API.getManualTransfers();
+            const transfers = data.event === event ? data.transfers : [];
+            FPL_API.saveManualTransfers({ event, transfers: [...transfers, { out: out.id, in: incoming.id }] });
+            loadTransfers();
+        }
+
+        function removeManual(index) {
+            const data = FPL_API.getManualTransfers();
+            data.transfers.splice(index, 1);
+            FPL_API.saveManualTransfers(data);
+            loadTransfers();
+        }
+
         async function loadTransfers() {
             const content = document.getElementById('transfers-content');
 
@@ -185,6 +259,8 @@
                             <div class="stat-card-label">${t('outfieldOptions')}</div>
                         </div>
                     </div>
+
+                    ${manualSection(plan, allPlayers)}
 
                     <div id="plan-section" class="tr-group" style="border-left: 6px solid var(--secondary-color);"></div>
 

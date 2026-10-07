@@ -62,6 +62,11 @@ Link to the APP: https://fpl-analyzer-eosin.vercel.app/
 - "Players to Watch" section by position
 - Value score calculations (points per million)
 
+### ✎ Transfers I've Made
+- FPL only publishes transfers after the deadline, so transfers you've already made in the FPL app can be entered on the Transfers page (player out → player in, with budget and 3-per-club checks)
+- Saved in your browser and used everywhere until the deadline: squad, bank, free transfers, transfer plan, suggested lineup, chips and rating (a note shows where they're included)
+- Cleared automatically once the deadline passes or FPL publishes your transfers
+
 ### 🗓️ Transfer Plan (multi-week)
 - Searches plans over the next 5 gameweeks: each week roll, make one or make two transfers, paying −4 hits beyond your free transfers, and keeps the best plans (beam search)
 - Banked free transfers count for ~2 pts each, so rolling stays an option

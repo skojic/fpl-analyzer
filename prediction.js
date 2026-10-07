@@ -652,13 +652,31 @@ const Predictor = {
 
         // Selling price: purchase price + half the rise (rounded down), or the current price if it fell.
         // Purchase price = latest transfer in (Free Hit squads revert, so skip those), else the start price.
-        const sellingPrice = {};
-        for (const p of squad) {
+        const sellFor = p => {
             const now = Math.round(p.price * 10);
             const buyIn = transfers.find(tr => tr.element_in === p.id && chipFor(tr.event) !== 'freehit');
             const bought = buyIn ? buyIn.element_in_cost : now - (p.costChangeStart || 0);
-            sellingPrice[p.id] = (now <= bought ? now : bought + Math.floor((now - bought) * sellOnFee)) / 10;
+            return (now <= bought ? now : bought + Math.floor((now - bought) * sellOnFee)) / 10;
+        };
+
+        // Transfers you entered yourself for the next deadline (FPL doesn't publish them before it).
+        // Dropped once that deadline has passed or FPL shows transfers for it.
+        const manual = this.manualTransfersFor(nextId, pending.length > 0);
+        const applied = [];
+        const boughtNow = new Set();
+        for (const tr of manual) {
+            const incoming = byId.get(tr.in);
+            const idx = squad.findIndex(p => p.id === tr.out);
+            if (!incoming || idx < 0 || squad.some(p => p.id === tr.in)) continue;
+            const out = squad[idx];
+            bank += (boughtNow.has(out.id) ? out.price : sellFor(out)) - incoming.price;
+            squad[idx] = { ...incoming, pickOrder: out.pickOrder, multiplier: out.multiplier };
+            boughtNow.add(incoming.id);
+            applied.push({ out, in: incoming });
         }
+
+        const sellingPrice = {};
+        for (const p of squad) sellingPrice[p.id] = boughtNow.has(p.id) ? p.price : sellFor(p);
 
         // Free transfers: one from the second gameweek played, +1 each deadline (max 5),
         // Wildcard and Free Hit leave the banked ones untouched
@@ -673,9 +691,21 @@ const Predictor = {
             freeTransfers = Math.min(maxFree, freeTransfers + 1);
         }
         if (played.length === 0) freeTransfers = 1;
-        freeTransfers = Math.max(0, freeTransfers - pending.length);
+        freeTransfers = Math.max(0, freeTransfers - pending.length - applied.length);
 
-        return { squad, bank: Math.round(bank * 10) / 10, sellingPrice, freeTransfers, pending, maxFree };
+        return { squad, bank: Math.round(bank * 10) / 10, sellingPrice, freeTransfers, pending, manual: applied, maxFree };
+    },
+
+    // Your entered transfers if they are for the next deadline; stale ones are cleared from storage
+    manualTransfersFor(nextId, fplHasTransfers) {
+        if (!FPL_API.IS_BROWSER || !nextId) return [];
+        const data = FPL_API.getManualTransfers();
+        if (!data.transfers.length) return [];
+        if (data.event !== nextId || fplHasTransfers) {
+            FPL_API.saveManualTransfers({ event: null, transfers: [] });
+            return [];
+        }
+        return data.transfers;
     },
 
     // Best players to buy per position by projection (season minutes), affordable for at least one sale
@@ -1060,6 +1090,7 @@ const Predictor = {
         const shape = pr => ({ ...pr.player, xPts: xPts(pr), isCaptain: pr === captain, isViceCaptain: pr === vice });
         return {
             gameweek: ctx.horizon[0].id,
+            manual: state.manual,
             xi: xi.map(shape),
             bench: bench.map(shape),
             points: lineup.points,

@@ -56,13 +56,22 @@
                 const c = s.changes;
 
                 // What to change compared with your current lineup
+                // Pair each player to start with one to bench: same position first (a goalkeeper always
+                // replaces a goalkeeper), then the rest by projected points
                 const lines = [];
-                const pairs = Math.max(c.toStart.length, c.toBench.length);
-                for (let i = 0; i < pairs; i++) {
+                const benchLeft = c.toBench.slice();
+                const take = start => {
+                    const i = benchLeft.findIndex(b => b.position === start.position);
+                    const j = i >= 0 ? i : benchLeft.findIndex(b => b.position !== 'GKP' && start.position !== 'GKP');
+                    return j >= 0 ? benchLeft.splice(j, 1)[0] : null;
+                };
+                const pairs = c.toStart.map(start => [start, take(start)]);
+                benchLeft.forEach(b => pairs.push([null, b]));
+                for (const [start, bench] of pairs) {
                     lines.push(UI.row({
-                        title: `${t('luStart')} ${c.toStart[i] ? name(c.toStart[i]) : '–'}`,
-                        meta: c.toBench[i] ? `${t('luBench')} ${name(c.toBench[i])}` : '',
-                        value: c.toStart[i] && c.toBench[i] ? UI.signed(c.toStart[i].xPts - c.toBench[i].xPts) : ''
+                        title: `${t('luStart')} ${start ? name(start) : '–'}`,
+                        meta: bench ? `${t('luBench')} ${name(bench)}` : '',
+                        value: start && bench ? UI.signed(start.xPts - bench.xPts) : ''
                     }));
                 }
                 if (c.captainTo && (!c.captainFrom || c.captainFrom.id !== c.captainTo.id)) {
@@ -72,7 +81,7 @@
                     lines.push(UI.row({ title: `${t('luVice')}: ${name(c.viceTo)}`, meta: c.viceFrom ? `${t('luInsteadOf')} ${name(c.viceFrom)}` : '' }));
                 }
 
-                let html = UI.stats([
+                let html = UI.manualNote(s.manual, s.gameweek) + UI.stats([
                     [safeNumber(s.points, 1), `${t('luSuggested')} · GW${s.gameweek}`],
                     [safeNumber(s.currentPoints, 1), t('luCurrent')],
                     [UI.signed(s.gain), t('luGain')]

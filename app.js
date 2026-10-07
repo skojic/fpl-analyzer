@@ -73,6 +73,7 @@ async function loadMyTeam() {
             const s = await Predictor.suggestLineup(teamData.picks, appData.allPlayers, teamData.entryHistory ? teamData.entryHistory.bank / 10 : 0);
             if (s) {
                 banner = `${t('cardLineup')} · GW${s.gameweek} · ${s.gain > 0.05 ? `${UI.signed(s.gain)} xPts` : t('luSameAsYours')}`;
+                banner += UI.manualNote(s.manual, s.gameweek);
                 pitch = UI.pitch(s.xi, s.bench, appData.fixtureMap, { label: p => `${safeNumber(p.xPts, 1)} xPts` });
             }
         }
@@ -190,7 +191,7 @@ async function loadTransferSuggestions() {
             content.innerHTML = `${UI.state('empty', t('noTransfers'))}`;
             return;
         }
-        content.innerHTML = UI.stats([
+        content.innerHTML = UI.manualNote(plan.manual, plan.horizon.length ? plan.horizon[0].id : '') + UI.stats([
             [UI.signed(plan.gain), t('planVsRoll')],
             [plan.freeTransfers, UI.term('ft', t('freeTransfers'))],
             [`£${safeNumber(plan.bank, 1)}m`, t('budget')]
