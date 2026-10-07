@@ -1,0 +1,10 @@
+{
+  "name": "fpl-analyzer",
+  "private": true,
+  "scripts": {
+    "test": "node test-api.js"
+  },
+  "engines": {
+    "node": "22.x"
+  }
+}

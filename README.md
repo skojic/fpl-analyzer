@@ -2,7 +2,7 @@
 
 A comprehensive web application for analyzing and optimizing your Fantasy Premier League team using real-time data from the official FPL API.
 
-Link to the APP: https://skojic.github.io/fpl-analyzer/
+Link to the APP: https://fpl-analyzer-fpl-analyzer1.vercel.app/
 
 ## Features
 
@@ -73,6 +73,7 @@ Link to the APP: https://skojic.github.io/fpl-analyzer/
 - **Vanilla JavaScript**: No heavy dependencies
 - **Chart.js 4.4**: Gameweek performance charts
 - **FPL API**: Official Fantasy Premier League API
+- **Vercel**: Hosts the static site and a small serverless proxy (`api/proxy.js`) for the FPL API, which can't be called from the browser directly (no CORS)
 - **PWA**: Progressive Web App — installable on iOS, Android, and desktop (manifest + service-worker ready)
 
 ## UI / UX Features
@@ -102,8 +103,8 @@ Link to the APP: https://skojic.github.io/fpl-analyzer/
 ## How to Use
 
 1. **Open the Application**
-   - Open `index.html` in any modern web browser (or deploy — see below)
-   - No server setup or installation required
+   - Go to the hosted app (link above)
+   - To run it locally, start `npx vercel dev` in the project folder and open the URL it prints. Opening `index.html` straight from disk won't load data, because the pages call the `/api/proxy` function. See [VERCEL_SETUP.md](VERCEL_SETUP.md)
 
 2. **Enter Your FPL Team ID**
    - The Guardian splash screen will ask for your Team ID on first visit
@@ -156,6 +157,11 @@ fpl-analyzer/
 ├── transfers.html          # Expanded transfers view
 ├── comparison.html         # Full-page player comparison view
 ├── manifest.json           # PWA manifest (installable app)
+├── api/proxy.js            # Vercel serverless proxy for the FPL API
+├── vercel.json             # Vercel project config
+├── package.json            # Node version for Vercel, `npm test`
+├── test-api.js             # Checks the API client and proxy (`npm test`)
+├── VERCEL_SETUP.md         # Deployment guide
 └── README.md               # This file
 ```
 
@@ -242,9 +248,9 @@ The enhanced points prediction system uses:
 
 ## Privacy & Data
 
-- All data is fetched directly from the official FPL API
+- All data comes from the official FPL API, fetched through the app's own proxy on Vercel
 - No user data is stored or transmitted to third parties
-- Your FPL Team ID is saved only in your own browser (`localStorage`) and never sent anywhere
+- Your FPL Team ID is saved in your own browser (`localStorage`); it is only sent as part of the FPL API requests the proxy forwards
 - Theme, language, and kit preferences are also stored locally in your browser
 
 ## Customization

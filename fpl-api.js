@@ -1,9 +1,7 @@
 // FPL API Integration Module
 const FPL_API = {
     BASE_URL: 'https://fantasy.premierleague.com/api',
-    // Vercel serverless proxy for browser CORS support
-    VERCEL_PROXY: 'https://fpl-analyzer-82wvbp663-fpl-analyzer1.vercel.app/api/proxy?url=',
-    TEAM_ID: parseInt(localStorage.getItem('fpl_team_id'), 10) || 1146081,
+    TEAM_ID: (typeof localStorage !== 'undefined' && parseInt(localStorage.getItem('fpl_team_id'), 10)) || 1146081,
     MAX_RETRIES: 2,
     RETRY_DELAY: 1000, // ms
     IS_BROWSER: typeof window !== 'undefined',
@@ -16,35 +14,39 @@ const FPL_API = {
         managerHistory: null
     },
 
-    // Helper to build URL - uses Vercel proxy in browser, direct in Node.js
-    buildUrl(endpoint, useProxy = false) {
-        // In browser, always use Vercel proxy
-        if (this.IS_BROWSER) {
-            return this.VERCEL_PROXY + encodeURIComponent(endpoint);
-        }
-        // In Node.js, use direct API access
-        return endpoint;
+    // Helper to build URL - uses the same-origin Vercel proxy (api/proxy.js) in browser, direct in Node.js
+    buildUrl(endpoint) {
+        if (!this.IS_BROWSER) return endpoint;
+        return `/api/proxy?url=${encodeURIComponent(endpoint)}`;
     },
 
-    // Enhanced fetch with retry logic
+    // Enhanced fetch with retry logic. Only network errors, 429 and 5xx are retried;
+    // other 4xx responses (e.g. 404, 410 from a removed deployment) fail immediately.
     async fetchWithRetry(endpoint, options = {}) {
         let lastError;
 
         for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
+            let retryable = true;
             try {
                 const url = this.buildUrl(endpoint);
-                console.log(`Attempt ${attempt + 1}: Fetching ${this.IS_BROWSER ? 'via Vercel proxy' : 'direct API'}`);
+                console.log(`Attempt ${attempt + 1}: Fetching ${this.IS_BROWSER ? 'via proxy' : 'direct API'}`);
 
-                const response = await fetch(url, {
-                    ...options,
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                        ...options.headers
-                    }
-                });
+                let response;
+                try {
+                    response = await fetch(url, options);
+                } catch (networkError) {
+                    // Blocked by CORS (e.g. redirect to Vercel login) or host unreachable
+                    throw new Error(this.IS_BROWSER ? 'Could not reach the data proxy' : networkError.message);
+                }
 
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    retryable = response.status === 429 || response.status >= 500;
+                    // The proxy answers with JSON { error }; anything else came from the hosting platform
+                    const body = await response.json().catch(() => null);
+                    const reason = body && body.error
+                        ? body.error
+                        : `${this.IS_BROWSER ? 'Proxy unavailable' : 'Request failed'} (HTTP ${response.status})`;
+                    throw new Error(reason);
                 }
 
                 const data = await response.json();
@@ -54,6 +56,8 @@ const FPL_API = {
                 lastError = error;
                 console.error(`❌ Attempt ${attempt + 1} failed:`, error.message);
 
+                if (!retryable) break;
+
                 // If this is not the last attempt, retry with delay
                 if (attempt < this.MAX_RETRIES) {
                     console.log(`⏳ Retrying in ${this.RETRY_DELAY}ms...`);
@@ -62,7 +66,7 @@ const FPL_API = {
             }
         }
 
-        throw new Error(`Failed to fetch ${endpoint} after ${this.MAX_RETRIES + 1} attempts: ${lastError.message}`);
+        throw lastError;
     },
 
     // Fetch bootstrap-static data (all players, teams, gameweeks)
@@ -76,7 +80,7 @@ const FPL_API = {
             return data;
         } catch (error) {
             console.error('Error fetching bootstrap data:', error);
-            throw new Error('Failed to load FPL data. Please check your internet connection and try again.');
+            throw new Error(`Failed to load FPL data: ${error.message}`);
         }
     },
 
@@ -91,7 +95,7 @@ const FPL_API = {
             return data;
         } catch (error) {
             console.error('Error fetching team data:', error);
-            throw new Error('Failed to load your team data. Team ID may be invalid.');
+            throw new Error(`Failed to load your team data (Team ID may be invalid): ${error.message}`);
         }
     },
 
@@ -103,7 +107,7 @@ const FPL_API = {
             return data;
         } catch (error) {
             console.error('Error fetching team picks:', error);
-            throw new Error(`Failed to load picks for gameweek ${gameweek}`);
+            throw new Error(`Failed to load picks for gameweek ${gameweek}: ${error.message}`);
         }
     },
 
@@ -118,7 +122,7 @@ const FPL_API = {
             return data;
         } catch (error) {
             console.error('Error fetching manager history:', error);
-            throw new Error('Failed to load your team history');
+            throw new Error(`Failed to load your team history: ${error.message}`);
         }
     },
 
@@ -133,7 +137,7 @@ const FPL_API = {
             return data;
         } catch (error) {
             console.error('Error fetching fixtures:', error);
-            throw new Error('Failed to load fixture data');
+            throw new Error(`Failed to load fixture data: ${error.message}`);
         }
     },
 
@@ -145,7 +149,7 @@ const FPL_API = {
             return data;
         } catch (error) {
             console.error('Error fetching player details:', error);
-            throw new Error(`Failed to load details for player ${playerId}`);
+            throw new Error(`Failed to load details for player ${playerId}: ${error.message}`);
         }
     },
 
@@ -328,3 +332,5 @@ const FPL_API = {
         });
     }
 };
+
+if (typeof module !== 'undefined') module.exports = FPL_API;

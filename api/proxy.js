@@ -1,25 +1,18 @@
 /**
- * Serverless CORS Proxy for FPL API
- * Deployed on Vercel to bypass CORS restrictions
- * 
+ * Serverless proxy for the FPL API
+ * Deployed on Vercel alongside the static site, so the browser calls it same-origin
+ *
  * Usage: /api/proxy?url=https://fantasy.premierleague.com/api/...
  */
 
-module.exports = async (req, res) => {
-    // CRITICAL: Set CORS headers IMMEDIATELY for ALL responses
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS, POST');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.setHeader('Content-Type', 'application/json');
+const ALLOWED_HOST = 'fantasy.premierleague.com';
 
-    // Handle preflight OPTIONS requests
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
+module.exports = async (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
 
     // Only allow GET requests
     if (req.method !== 'GET') {
-        return res.status(405).json({ 
+        return res.status(405).json({
             error: 'Method not allowed',
             method: req.method
         });
@@ -33,21 +26,24 @@ module.exports = async (req, res) => {
             return res.status(400).json({ error: 'Missing url parameter' });
         }
 
-        // Decode the URL
-        const decodedUrl = decodeURIComponent(url);
-        
-        // Only allow FPL API requests
-        if (!decodedUrl.includes('fantasy.premierleague.com')) {
-            return res.status(400).json({ 
+        // Only allow FPL API requests (query values arrive already decoded)
+        let target;
+        try {
+            target = new URL(url);
+        } catch (e) {
+            return res.status(400).json({ error: 'Invalid url parameter' });
+        }
+        if (target.protocol !== 'https:' || target.hostname !== ALLOWED_HOST || !target.pathname.startsWith('/api/')) {
+            return res.status(400).json({
                 error: 'Only FPL API requests allowed',
-                url: decodedUrl
+                url
             });
         }
 
-        console.log(`[Proxy] Fetching: ${decodedUrl}`);
+        console.log(`[Proxy] Fetching: ${target.href}`);
 
         // Fetch from FPL API
-        const response = await fetch(decodedUrl, {
+        const response = await fetch(target.href, {
             method: 'GET',
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -81,18 +77,16 @@ module.exports = async (req, res) => {
             });
         }
 
-        // Set cache header
-        res.setHeader('Cache-Control', 'public, max-age=300');
+        // Cache in the browser and on Vercel's CDN, so repeat requests skip the function
+        res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300, stale-while-revalidate=600');
 
-        // Return data with CORS headers
         return res.status(200).json(data);
 
     } catch (error) {
         console.error('[Proxy] Error:', error);
         return res.status(502).json({
             error: 'Proxy error',
-            message: error.message,
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+            message: error.message
         });
     }
 };

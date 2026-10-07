@@ -33,7 +33,7 @@ async function initializeApp() {
         ]);
     } catch (error) {
         console.error('Error initializing app:', error);
-        showError('Failed to load data. Please check your internet connection and try again.');
+        showError(error.message);
     }
 }
 
