@@ -49,8 +49,8 @@ Link to the APP: https://fpl-analyzer-eosin.vercel.app/
 - Also available as a **Current / Suggested** switch on the Home My Team card
 
 ### 🆚 Next Gameweek
-- Every match of the next gameweek: the model's expected goals, most likely score and win / draw / loss chances from team strength alone (an independent view, without odds), next to the bookmakers' chances (average of ~20 bookmakers, margin removed)
-- Who is favoured, whether the model and the bookmakers agree, and your players in each match
+- Every match of the next gameweek with the team the bookmakers favour and its chance (average of ~20 bookmakers, margin removed)
+- Your players in each match listed under it
 - Also a **Next GW** view on the Home My Team card (next to Current / Suggested)
 
 ### 🔄 Transfer Suggestions

@@ -1125,7 +1125,8 @@ const Predictor = {
                     model: { goalsHome: goals.scored, goalsAway: goals.conceded, ...this.outcomeProbabilities(goals.scored, goals.conceded) },
                     bookmakers: odds ? {
                         home: odds.pHome, draw: odds.pDraw, away: odds.pAway,
-                        goalsHome: odds.goalsHome, goalsAway: odds.goalsAway, count: odds.bookmakers
+                        goalsHome: odds.goalsHome, goalsAway: odds.goalsAway, count: odds.bookmakers,
+                        score: this.outcomeProbabilities(odds.goalsHome, odds.goalsAway).score
                     } : null
                 };
             });

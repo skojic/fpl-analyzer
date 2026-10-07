@@ -1,7 +1,36 @@
 // FPL API Integration Module
 const FPL_API = {
     BASE_URL: 'https://fantasy.premierleague.com/api',
-    TEAM_ID: (typeof localStorage !== 'undefined' && parseInt(localStorage.getItem('fpl_team_id'), 10)) || 1146081,
+    // Your FPL team: in the browser always the ID saved on first visit or with Change ID (read live, so
+    // every page and call uses the current one); in Node scripts / tests FPL_TEAM_ID or a sample team
+    TEAM_ID_KEY: 'fpl_team_id',
+    get TEAM_ID() {
+        if (typeof localStorage !== 'undefined') {
+            const id = parseInt(localStorage.getItem(this.TEAM_ID_KEY), 10);
+            return id > 0 ? id : null;
+        }
+        return parseInt(typeof process !== 'undefined' && process.env.FPL_TEAM_ID, 10) || 1146081;
+    },
+
+    hasTeamId() {
+        return this.TEAM_ID !== null;
+    },
+
+    // Save a new team ID (digits only); clears everything cached for the previous team
+    setTeamId(id) {
+        const clean = String(id).trim();
+        if (!/^\d{1,10}$/.test(clean) || parseInt(clean, 10) <= 0) throw new Error('Team ID must be a number');
+        localStorage.setItem(this.TEAM_ID_KEY, clean);
+        this.resetCache();
+        return parseInt(clean, 10);
+    },
+
+    // Check an ID belongs to a real FPL team before saving it; returns the team name
+    async verifyTeamId(id) {
+        const data = await this.fetchWithRetry(`${this.BASE_URL}/entry/${parseInt(id, 10)}/`);
+        if (!data || !data.id) throw new Error('Team not found');
+        return data.name;
+    },
     MAX_RETRIES: 2,
     RETRY_DELAY: 1000, // ms
     IS_BROWSER: typeof window !== 'undefined',

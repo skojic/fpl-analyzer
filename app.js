@@ -79,16 +79,13 @@ async function loadMyTeam() {
         if (view === 'nextgw') {
             const r = await Predictor.getMatchPredictions();
             if (r && r.matches.length) {
-                const pct = x => `${Math.round(x * 100)}%`;
-                const fav = (p, m) => (p.home >= p.away ? `${m.home.shortName} ${pct(p.home)}` : `${m.away.shortName} ${pct(p.away)}`);
                 banner = `${t('cardNextGW')} · GW${r.gameweek}`;
                 pitch = r.matches.map(m => {
                     const yours = teamData.picks.filter(p => p.teamId === m.home.id || p.teamId === m.away.id);
                     return UI.row({
                         title: `${m.home.shortName} v ${m.away.shortName}${yours.length ? ` <span class="ui-muted">★ ${yours.map(p => UI.esc(p.name)).join(', ')}</span>` : ''}`,
-                        meta: `${t('nxModel')} ${fav(m.model, m)}${m.bookmakers ? ` · ${t('nxBooks')} ${fav(m.bookmakers, m)}` : ''}`,
-                        value: `${safeNumber(m.model.goalsHome, 1)}–${safeNumber(m.model.goalsAway, 1)}`,
-                        label: 'xG',
+                        meta: m.bookmakers ? UI.favourite(m) : t('nxNoOdds'),
+                        value: '',
                         href: 'nextgw.html'
                     });
                 }).join('');
@@ -387,5 +384,5 @@ function showError(message) {
 // Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     // Only auto-start if a team ID has been saved (guardian handles first-time setup)
-    if (localStorage.getItem('fpl_team_id')) initializeApp();
+    if (FPL_API.hasTeamId()) initializeApp();
 });

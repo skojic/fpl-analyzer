@@ -1819,6 +1819,14 @@ header h1 {
     color: var(--primary-color);
     font-weight: 700;
 }
+/* Author name links to GitHub, styled like the text around it */
+.site-footer .footer-author,
+.site-footer .footer-author:visited,
+.site-footer .footer-author:hover {
+    color: var(--primary-color);
+    font-weight: 700;
+    text-decoration: none;
+}
 .site-footer .footer-sep {
     margin: 0 12px;
     opacity: 0.35;

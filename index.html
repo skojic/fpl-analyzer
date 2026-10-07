@@ -341,6 +341,7 @@
                 <input type="number" id="guardian-input" class="guardian-input" min="1" max="9999999"
                        data-i18n="guardianInputPlaceholder" data-i18n-attr="placeholder" placeholder="e.g. 1234567" />
                 <button id="guardian-continue" class="guardian-btn" disabled data-i18n="guardianContinue">Continue →</button>
+                <p id="guardian-error" class="team-id-error" role="alert"></p>
             </div>
             <details class="guardian-how">
                 <summary><span data-i18n="guardianHowTitle">How to find your Team ID</span></summary>
@@ -508,6 +509,7 @@
             <h3 data-i18n="changeTeamIdTitle">Change FPL Team ID</h3>
             <input type="number" id="change-id-input" class="guardian-input" min="1" max="9999999"
                    data-i18n="guardianInputPlaceholder" data-i18n-attr="placeholder" placeholder="e.g. 1234567" />
+            <p id="change-id-error" class="team-id-error" role="alert"></p>
             <div class="modal-actions">
                 <button id="change-id-save" class="guardian-btn" onclick="saveNewTeamId()" data-i18n="changeTeamIdSave">Save &amp; Reload</button>
                 <button class="modal-cancel-btn" onclick="closeChangeModal()" data-i18n="changeTeamIdCancel">Cancel</button>
@@ -517,46 +519,51 @@
 
     <script>
     // ─── Guardian / Team ID Management ────────────────────────────────────────
+    // The team ID lives in one place: FPL_API.TEAM_ID (saved in this browser). The first-visit screen
+    // and Change ID both check the team exists, save it with FPL_API.setTeamId and reload, so every
+    // card and page starts fresh with the new team.
     (function guardianInit() {
-        const STORAGE_KEY = 'fpl_team_id';
+        const validInput = value => /^\d{1,10}$/.test(value.trim()) && parseInt(value, 10) > 0;
 
         function updateBadge(id) {
             const badge = document.getElementById('tid-badge');
             if (badge) badge.textContent = `id:${id}`;
         }
 
-        function initGuardian() {
-            const storedId = localStorage.getItem(STORAGE_KEY);
-            const guardian = document.getElementById('fpl-guardian');
+        // Verify, save and reload; shows the error under the input when the team doesn't exist
+        async function saveAndReload(input, btn, errorEl) {
+            const id = input.value.trim();
+            if (!validInput(id)) return;
+            btn.disabled = true;
+            errorEl.textContent = t('teamIdChecking');
+            try {
+                await FPL_API.verifyTeamId(id);
+            } catch (error) {
+                errorEl.textContent = t('teamIdNotFound').replace('{id}', id);
+                btn.disabled = false;
+                return;
+            }
+            FPL_API.setTeamId(id);
+            location.reload();
+        }
 
-            if (storedId && /^\d{4,}$/.test(storedId.trim())) {
+        function initGuardian() {
+            const guardian = document.getElementById('fpl-guardian');
+            if (FPL_API.hasTeamId()) {
                 // ID already known — app.js DOMContentLoaded already started initializeApp
-                FPL_API.TEAM_ID = parseInt(storedId, 10);
                 guardian.classList.add('guardian-hidden');
-                updateBadge(storedId);
+                updateBadge(FPL_API.TEAM_ID);
                 return;
             }
 
-            // No valid ID — show guardian; app.js checks localStorage so it won't auto-start
+            // No ID yet — show the first-visit screen; app.js won't start without an ID
             applyI18n();
             const input = document.getElementById('guardian-input');
             const btn   = document.getElementById('guardian-continue');
-
-            input.addEventListener('input', () => {
-                btn.disabled = !(input.value.trim().length >= 4);
-            });
-            btn.addEventListener('click', () => {
-                const id = input.value.trim();
-                if (!id) return;
-                localStorage.setItem(STORAGE_KEY, id);
-                FPL_API.TEAM_ID = parseInt(id, 10);
-                guardian.classList.add('guardian-hidden');
-                updateBadge(id);
-                initializeApp();
-            });
-            input.addEventListener('keydown', e => {
-                if (e.key === 'Enter' && !btn.disabled) btn.click();
-            });
+            const error = document.getElementById('guardian-error');
+            input.addEventListener('input', () => { btn.disabled = !validInput(input.value); error.textContent = ''; });
+            btn.addEventListener('click', () => saveAndReload(input, btn, error));
+            input.addEventListener('keydown', e => { if (e.key === 'Enter' && !btn.disabled) btn.click(); });
         }
 
         // ── Change Team ID modal ──
@@ -564,13 +571,16 @@
             const modal = document.getElementById('change-id-modal');
             const input = document.getElementById('change-id-input');
             const btn   = document.getElementById('change-id-save');
+            const error = document.getElementById('change-id-error');
             applyI18n(); // re-apply translations in case language changed
-            input.value = localStorage.getItem(STORAGE_KEY) || '';
-            btn.disabled = !(input.value.trim().length >= 4);
+            input.value = FPL_API.TEAM_ID || '';
+            error.textContent = '';
+            btn.disabled = !validInput(input.value);
             modal.removeAttribute('hidden');
             input.focus();
             input.select();
-            input.oninput = () => { btn.disabled = !(input.value.trim().length >= 4); };
+            input.oninput = () => { btn.disabled = !validInput(input.value); error.textContent = ''; };
+            input.onkeydown = e => { if (e.key === 'Enter' && !btn.disabled) btn.click(); };
         };
 
         window.closeChangeModal = function () {
@@ -578,14 +588,7 @@
         };
 
         window.saveNewTeamId = function () {
-            const id = document.getElementById('change-id-input').value.trim();
-            if (!id) return;
-            localStorage.setItem(STORAGE_KEY, id);
-            FPL_API.TEAM_ID = parseInt(id, 10);
-            FPL_API.cache   = { bootstrap: null, teamData: null, fixtures: null, managerHistory: null };
-            closeChangeModal();
-            updateBadge(id);
-            initializeApp();
+            saveAndReload(document.getElementById('change-id-input'), document.getElementById('change-id-save'), document.getElementById('change-id-error'));
         };
 
         // Close modal when clicking backdrop
@@ -599,7 +602,7 @@
     </script>
 
     <footer class="site-footer" data-i18n-html="footerHtml">
-        <span data-i18n="footerText">Made with</span> <span class="heart">&#x2665;</span> <span data-i18n="footerBy">for you by</span> <strong>Srdjan Kojic</strong>
+        <span data-i18n="footerText">Made with</span> <span class="heart">&#x2665;</span> <span data-i18n="footerBy">for you by</span> <a class="footer-author" href="https://github.com/skojic" target="_blank" rel="noopener">Srdjan Kojic</a>
     </footer>
 </body>
 </html>

@@ -23,9 +23,7 @@
         .nx-team { display: flex; align-items: center; gap: 6px; }
         .nx-team.away { justify-content: flex-end; }
         .nx-team img { width: 24px; height: 24px; }
-        .nx-score { text-align: center; font-size: 1.25em; }
-        .nx-score small { display: block; font-size: 0.6em; font-weight: 600; color: var(--text-muted); }
-        .nx-line { margin: 6px 0; }
+        .nx-score { text-align: center; font-size: 1.1em; color: var(--text-muted); }
         .nx-yours { margin-top: var(--space-2); }
     </style>
 </head>
@@ -62,14 +60,10 @@
                 <div class="ui-meta" style="margin:0;">${when}</div>
                 <div class="nx-teams">
                     <span class="nx-team">${badge(m.home)}${m.home.shortName}</span>
-                    <span class="nx-score">${safeNumber(m.model.goalsHome, 1)} – ${safeNumber(m.model.goalsAway, 1)}<small>${t('nxLikely')} ${m.model.score.join('–')}</small></span>
+                    <span class="nx-score">v</span>
                     <span class="nx-team away">${m.away.shortName}${badge(m.away)}</span>
                 </div>
-                <div class="nx-line"><strong>${t('nxModel')}</strong>${UI.outcomeBar(m.model, m.home.shortName, m.away.shortName)}</div>
-                <div class="nx-line"><strong>${t('nxBooks')}</strong>${m.bookmakers
-                    ? UI.outcomeBar(m.bookmakers, m.home.shortName, m.away.shortName) + `<div class="ui-meta" style="margin:2px 0 0;">${t('nxBookCount').replace('{n}', m.bookmakers.count)}</div>`
-                    : `<div class="ui-meta" style="margin:2px 0 0;">${t('nxNoOdds')}</div>`}</div>
-                <div class="ui-meta">${UI.favourite(m)}</div>
+                <div class="ui-meta">${m.bookmakers ? UI.favourite(m) : t('nxNoOdds')}</div>
                 ${yours.length ? `<div class="nx-yours ui-chips">${yours.map(p => `<a class="ui-chip" href="player.html?id=${p.id}">${UI.esc(p.name)}</a>`).join('')}</div>` : ''}
             </div>`;
         }
@@ -96,7 +90,7 @@
     </script>
 
     <footer class="site-footer" data-i18n-html="footerHtml">
-        Made with <span class="heart">&#x2665;</span> for you by <strong>Srdjan Kojic</strong>
+        Made with <span class="heart">&#x2665;</span> for you by <a class="footer-author" href="https://github.com/skojic" target="_blank" rel="noopener">Srdjan Kojic</a>
     </footer>
 </body>
 </html>
