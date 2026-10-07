@@ -31,7 +31,8 @@ async function initializeApp() {
             loadPredictions(),
             loadTransferSuggestions(),
             loadLeagueCard(),
-            loadFixturesCard()
+            loadFixturesCard(),
+            loadOptimizerCard()
         ]);
     } catch (error) {
         console.error('Error initializing app:', error);
@@ -793,6 +794,49 @@ async function loadFixturesCard() {
             + list(t('fxBestDefence'), c => c.csProb, v => `${v.toFixed(1)} CS`);
     } catch (error) {
         content.innerHTML = `<div class="loading">${t('errorFixtures')}</div>`;
+        console.error(error);
+    }
+}
+
+// Load AI Team & Chips Card: team rating, Wildcard gain and the best week per chip
+async function loadOptimizerCard() {
+    const content = document.getElementById('optimizer-content');
+    if (!content) return;
+
+    try {
+        const [teamData, allPlayers] = await Promise.all([FPL_API.getTeamComposition(), FPL_API.getAllPlayers()]);
+        const bank = teamData.entryHistory ? teamData.entryHistory.bank / 10 : 0;
+        const [report, calendar] = await Promise.all([
+            Predictor.getSquadReport(teamData.picks, allPlayers, bank),
+            Predictor.getChipCalendar(teamData.picks, allPlayers, bank)
+        ]);
+        if (!report) {
+            content.innerHTML = `<div class="loading">${t('fxNone')}</div>`;
+            return;
+        }
+        const names = { freehit: t('chipFreeHit'), bboost: t('chipBenchBoost'), '3xc': t('chipTripleCaptain') };
+        let html = `<div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-card-value">${report.rating}/100</div>
+                    <div class="stat-card-label">${t('opRating')}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-value">+${safeNumber(report.wildcard ? report.wildcard.gain : 0, 1)}</div>
+                    <div class="stat-card-label">${t('chipWildcard')} (${report.wildcard ? report.wildcard.incoming.length : 0} ${t('opChanges')})</div>
+                </div>
+            </div>`;
+        if (calendar && Object.keys(calendar.best).length) {
+            html += `<h4 style="margin:14px 0 6px;">${t('opBestWeeks')}</h4><div class="team-grid">${Object.entries(calendar.best).map(([chip, gw]) => {
+                const week = calendar.weeks.find(w => w.gameweek === gw);
+                return `<div class="player-row">
+                    <div class="player-info"><div class="player-name">${names[chip]}</div><div class="player-meta">GW${gw}</div></div>
+                    <div class="player-stats"><div class="stat"><div class="stat-value">+${safeNumber(week[chip], 1)}</div><div class="stat-label">${t('opPts')}</div></div></div>
+                </div>`;
+            }).join('')}</div>`;
+        }
+        content.innerHTML = html;
+    } catch (error) {
+        content.innerHTML = `<div class="loading">${t('errorOptimizer')}</div>`;
         console.error(error);
     }
 }

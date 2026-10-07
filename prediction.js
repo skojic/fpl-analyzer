@@ -112,26 +112,26 @@ const Predictor = {
     SUB_MINUTES: 20,        // typical minutes for a substitute appearance
     FORMATION: { GKP: [1, 1], DEF: [3, 5], MID: [2, 5], FWD: [1, 3] },
 
-    context: null,          // shared fixtures / team ratings, built once per page load
+    contexts: {},           // shared fixtures / team ratings per horizon length, built once per page load
     recentForm: {},         // playerId -> minutes profile from recent matches (null when unavailable)
 
     // ── Context: horizon, fixtures per team and gameweek, team strength ────
-    async getContext() {
-        if (this.context) return this.context;
+    async getContext(length = this.HORIZON) {
+        if (this.contexts[length]) return this.contexts[length];
 
         const [bootstrap, fixtures] = await Promise.all([FPL_API.getBootstrapStatic(), FPL_API.getFixtures()]);
-        this.context = this.buildContext(bootstrap, fixtures);
-        return this.context;
+        this.contexts[length] = this.buildContext(bootstrap, fixtures, null, length);
+        return this.contexts[length];
     },
 
     // Context from raw bootstrap + fixtures. `nextEventId` overrides the next gameweek
     // (the backtest rebuilds the season as it stood before a past gameweek).
-    buildContext(bootstrap, fixtures, nextEventId = null) {
+    buildContext(bootstrap, fixtures, nextEventId = null, length = this.HORIZON) {
         // Horizon: the next N gameweeks (transfers made now count from the next deadline)
         const next = nextEventId ? bootstrap.events.find(e => e.id === nextEventId) : bootstrap.events.find(e => e.is_next);
         const horizon = next
             ? bootstrap.events
-                .filter(e => e.id >= next.id && e.id < next.id + this.HORIZON)
+                .filter(e => e.id >= next.id && e.id < next.id + length)
                 .map(e => ({ id: e.id, deadline: new Date(e.deadline_time) }))
             : [];
         const horizonIds = new Set(horizon.map(e => e.id));
@@ -634,6 +634,233 @@ const Predictor = {
             }
         }
         return { events, leagueAvg: ctx.leagueAvg, teams: Object.values(rows) };
+    },
+
+    // ── Squad optimizer (Wildcard, Free Hit, team rating) ────────────────────
+    SQUAD_SHAPE: { GKP: 2, DEF: 5, MID: 5, FWD: 3 },
+    OPT_POOL: 30,           // best players per position (by projection) the optimizer may pick
+    OPT_CHEAP: 6,           // plus the cheapest regular starters per position, for the bench
+    OPT_PAIR_POOL: 12,      // players per position tried in two-player swaps
+    BENCH_WEIGHT: 0.1,      // bench points count a little: cover for players who don't start
+
+    // Weighted best XI + captain over the given gameweeks, plus a little for the bench
+    squadScore(projections, gws, benchWeight = this.BENCH_WEIGHT) {
+        let score = 0;
+        for (const k of gws) {
+            const lineup = this.bestLineup(projections, k);
+            const xi = lineup.points - (lineup.captain ? lineup.captain.perGW[k] : 0);
+            const bench = projections.reduce((sum, pr) => sum + pr.perGW[k], 0) - xi;
+            score += Math.pow(this.DECAY, k) * (lineup.points + benchWeight * bench);
+        }
+        return score;
+    },
+
+    // Best 15 within budget, formation and the club limit for gameweeks `gws` (indexes into ctx.horizon).
+    // Local search on the real objective, started from the cheapest valid squad and (when given) from
+    // your current squad: repeatedly apply the best one- or two-player swap until nothing improves it.
+    optimizeSquad(allPlayers, budget, ctx, gws, { benchWeight = this.BENCH_WEIGHT, start = null } = {}) {
+        const clubLimit = (ctx.bootstrap.game_settings || {}).squad_team_limit || 3;
+        const weightOf = pr => gws.reduce((sum, k) => sum + pr.perGW[k] * Math.pow(this.DECAY, k), 0);
+
+        // Candidate pool per position
+        const pool = {};
+        for (const pos of Object.keys(this.SQUAD_SHAPE)) {
+            const all = allPlayers
+                .filter(p => p.position === pos && p.status !== 'u')
+                .map(p => this.projectPlayerSync(p, ctx));
+            const best = all.slice().sort((a, b) => weightOf(b) - weightOf(a)).slice(0, this.OPT_POOL);
+            const cheap = all.filter(pr => pr.minutes.pStart >= 0.5).sort((a, b) => a.player.price - b.player.price).slice(0, this.OPT_CHEAP);
+            pool[pos] = [...new Map([...best, ...cheap].map(pr => [pr.player.id, pr])).values()]
+                .sort((a, b) => weightOf(b) - weightOf(a));
+        }
+
+        const cost = sq => sq.reduce((sum, pr) => sum + pr.player.price, 0);
+        const clubOk = sq => {
+            const c = {};
+            for (const pr of sq) if ((c[pr.player.teamId] = (c[pr.player.teamId] || 0) + 1) > clubLimit) return false;
+            return true;
+        };
+
+        // Cheapest valid squad
+        let squad = [];
+        const clubs = {};
+        for (const [pos, n] of Object.entries(this.SQUAD_SHAPE)) {
+            const byPrice = pool[pos].slice().sort((a, b) => a.player.price - b.player.price);
+            for (const pr of byPrice) {
+                if (squad.filter(x => x.player.position === pos).length >= n) break;
+                if ((clubs[pr.player.teamId] || 0) >= clubLimit) continue;
+                squad.push(pr);
+                clubs[pr.player.teamId] = (clubs[pr.player.teamId] || 0) + 1;
+            }
+        }
+        const starts = [];
+        if (squad.length === 15 && cost(squad) <= budget + 1e-9) starts.push(squad);
+        if (start && start.length === 15 && cost(start) <= budget + 1e-9 && clubOk(start)) starts.push(start);
+
+        let bestResult = null;
+        for (const first of starts) {
+            const result = this.improveSquad(first, pool, budget, gws, benchWeight, cost, clubOk);
+            if (!bestResult || result.score > bestResult.score) bestResult = result;
+        }
+        return bestResult && { ...bestResult, cost: Math.round(cost(bestResult.squad) * 10) / 10 };
+    },
+
+    improveSquad(squad, pool, budget, gws, benchWeight, cost, clubOk) {
+        let score = this.squadScore(squad, gws, benchWeight);
+
+        for (let iteration = 0; iteration < 200; iteration++) {
+            const ids = new Set(squad.map(pr => pr.player.id));
+            const spare = budget - cost(squad);
+            let best = null;
+
+            // One-player swaps
+            squad.forEach((out, i) => {
+                for (const pr of pool[out.player.position]) {
+                    if (ids.has(pr.player.id) || pr.player.price - out.player.price > spare + 1e-9) continue;
+                    const next = squad.slice();
+                    next[i] = pr;
+                    if (!clubOk(next)) continue;
+                    const s = this.squadScore(next, gws, benchWeight);
+                    if (s > score + 1e-6 && (!best || s > best.score)) best = { squad: next, score: s };
+                }
+            });
+
+            // Two-player swaps (move money between positions) only when no single swap helps
+            if (!best) {
+                for (let i = 0; i < squad.length; i++) {
+                    for (let j = i + 1; j < squad.length; j++) {
+                        const [a, b] = [squad[i], squad[j]];
+                        for (const c of pool[a.player.position].slice(0, this.OPT_PAIR_POOL)) {
+                            if (ids.has(c.player.id)) continue;
+                            for (const d of pool[b.player.position].slice(0, this.OPT_PAIR_POOL)) {
+                                if (ids.has(d.player.id) || d.player.id === c.player.id) continue;
+                                if (c.player.price + d.player.price - a.player.price - b.player.price > spare + 1e-9) continue;
+                                const next = squad.slice();
+                                next[i] = c;
+                                next[j] = d;
+                                if (!clubOk(next)) continue;
+                                const s = this.squadScore(next, gws, benchWeight);
+                                if (s > score + 1e-6 && (!best || s > best.score)) best = { squad: next, score: s };
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!best) break;
+            squad = best.squad;
+            score = best.score;
+        }
+
+        return { squad, score };
+    },
+
+    // Wildcard (best squad over the horizon), Free Hit (best squad for the next gameweek) and a team rating
+    // (your squad's value as a share of the Wildcard squad's), all with your budget: bank + selling prices.
+    async getSquadReport(currentTeam, allPlayers, bank) {
+        const ctx = await this.getContext();
+        const state = await this.getTransferState(currentTeam, allPlayers, bank, ctx);
+        if (!ctx.horizon.length) return null;
+        await this.loadRecentHistory(state.squad);
+
+        const budget = Math.round((state.bank + state.squad.reduce((s, p) => s + state.sellingPrice[p.id], 0)) * 10) / 10;
+        const all = ctx.horizon.map((gw, k) => k);
+        const current = state.squad.map(p => this.projectPlayerSync(p, ctx));
+
+        // Selling prices count as the price of the players you already own
+        const start = state.squad.map(p => this.projectPlayerSync({ ...p, price: state.sellingPrice[p.id] }, ctx));
+        const wildcard = this.optimizeSquad(allPlayers, budget, ctx, all, { start });
+        const freeHit = this.optimizeSquad(allPlayers, budget, ctx, [0], { benchWeight: 0, start });
+        const value = (sq, gws) => this.squadScore(sq, gws, 0);
+        const changes = sq => {
+            const keep = new Set(state.squad.map(p => p.id));
+            const incoming = sq.squad.filter(pr => !keep.has(pr.player.id)).map(pr => pr.player);
+            const outgoing = state.squad.filter(p => !sq.squad.some(pr => pr.player.id === p.id));
+            return { incoming, outgoing };
+        };
+
+        const currentValue = value(current, all);
+        const wildcardValue = wildcard ? value(wildcard.squad, all) : currentValue;
+        return {
+            budget,
+            horizon: ctx.horizon,
+            rating: Math.round(100 * Math.min(1, currentValue / Math.max(1e-9, wildcardValue))),
+            currentValue,
+            wildcard: wildcard && { ...wildcard, value: wildcardValue, gain: wildcardValue - currentValue, ...changes(wildcard) },
+            freeHit: freeHit && {
+                ...freeHit,
+                gameweek: ctx.horizon[0].id,
+                value: value(freeHit.squad, [0]),
+                gain: value(freeHit.squad, [0]) - value(current, [0]),
+                ...changes(freeHit)
+            }
+        };
+    },
+
+    // ── Chip calendar ────────────────────────────────────────────────────────
+    // Value of each chip you still have, per gameweek until the current chip window closes, with your
+    // current squad: Bench Boost = bench points, Triple Captain = the captain's points once more,
+    // Free Hit = best one-week squad minus your XI. Later weeks assume no transfers: treat them as a guide.
+    async getChipCalendar(currentTeam, allPlayers, bank, { freeHit = true } = {}) {
+        const base = await this.getContext();
+        if (!base.horizon.length) return null;
+        const next = base.horizon[0].id;
+        const chips = base.bootstrap.chips || [];
+        const open = chips.filter(c => c.start_event <= next && next <= c.stop_event);
+        if (!open.length) return null;
+        const stop = Math.min(...open.map(c => c.stop_event));
+        const ctx = await this.getContext(Math.max(1, stop - next + 1));
+
+        const state = await this.getTransferState(currentTeam, allPlayers, bank, base);
+        let used = [];
+        try {
+            used = (await FPL_API.getManagerHistory()).chips || [];
+        } catch (error) {
+            console.error('Chip history unavailable:', error.message);
+        }
+        const available = [...new Set(open
+            .filter(c => !used.some(u => u.name === c.name && u.event >= c.start_event && u.event <= c.stop_event))
+            .map(c => c.name))];
+
+        await this.loadRecentHistory(state.squad);
+        const current = state.squad.map(p => this.projectPlayerSync(p, ctx));
+        const start = state.squad.map(p => this.projectPlayerSync({ ...p, price: state.sellingPrice[p.id] }, ctx));
+        const budget = Math.round((state.bank + state.squad.reduce((s, p) => s + state.sellingPrice[p.id], 0)) * 10) / 10;
+        const teamIds = ctx.bootstrap.teams.map(t => t.id);
+
+        const weeks = ctx.horizon.map((gw, k) => {
+            const lineup = this.bestLineup(current, k);
+            const captainPts = lineup.captain ? lineup.captain.perGW[k] : 0;
+            const xi = lineup.points - captainPts;
+            const total = current.reduce((sum, pr) => sum + pr.perGW[k], 0);
+            const counts = teamIds.map(id => ((ctx.fixturesByTeam[id] || {})[gw.id] || []).length);
+            let freeHitGain = null;
+            if (freeHit && available.includes('freehit')) {
+                const fh = this.optimizeSquad(allPlayers, budget, ctx, [k], { benchWeight: 0, start });
+                if (fh) freeHitGain = this.bestLineup(fh.squad, k).points - lineup.points;
+            }
+            return {
+                gameweek: gw.id,
+                xiPoints: lineup.points,
+                captain: lineup.captain ? lineup.captain.player : null,
+                bboost: total - xi,
+                '3xc': captainPts,
+                freehit: freeHitGain,
+                doubleTeams: counts.filter(n => n > 1).length,
+                blankTeams: counts.filter(n => n === 0).length,
+                squadDoubles: current.filter(pr => pr.fixtures.filter(f => f.event === gw.id).length > 1).length,
+                squadBlanks: current.filter(pr => !pr.fixtures.some(f => f.event === gw.id)).length
+            };
+        });
+
+        // Best week per chip
+        const best = {};
+        for (const chip of ['bboost', '3xc', 'freehit']) {
+            if (!available.includes(chip)) continue;
+            const ranked = weeks.filter(w => w[chip] !== null).sort((a, b) => b[chip] - a[chip]);
+            if (ranked.length) best[chip] = ranked[0].gameweek;
+        }
+        return { available, used, deadline: stop, weeks, best };
     },
 
     // ── Multi-week transfer planner ──────────────────────────────────────────

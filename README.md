@@ -57,6 +57,12 @@ Link to the APP: https://fpl-analyzer-eosin.vercel.app/
 - **Lock** players you want to keep and **ban** players you never want to buy; choices are saved in your browser per team
 - Shown on the Transfers page as a gameweek timeline, and as a one-line plan on the dashboard card
 
+### 🤖 AI Team & Chips
+- **Squad optimizer**: best 15 (2 GKP, 5 DEF, 5 MID, 3 FWD) within your budget and the 3-per-club limit, scored on best XI + captain each gameweek; local search with one- and two-player swaps, started from the cheapest valid squad and from your own
+- **AI team rating**: your squad's projected points over the next 5 gameweeks as a share of the optimizer's best squad for your budget (bank + selling prices)
+- **Wildcard** squad for the next 5 gameweeks and **Free Hit** squad for the next one, with the changes from your squad
+- **Chip calendar** to the end of the current chip window (GW19 / GW38): Bench Boost, Triple Captain and Free Hit value per gameweek with your squad, blank and double gameweeks, best week per chip; chips you've used are crossed out
+
 ### 🏆 Mini-League
 - Standings of your classic leagues (private ones first; large public leagues use the top 50)
 - **Effective ownership (EO)** among your rivals: 100% per starting owner, 200% per captain
@@ -170,6 +176,7 @@ fpl-analyzer/
 ├── league.js               # Mini-league effective ownership
 ├── league.html             # Expanded mini-league view
 ├── fixtures.html           # Fixture analyser
+├── optimizer.html          # AI team rating, Wildcard / Free Hit squads, chip calendar
 ├── api/proxy.js            # Vercel serverless proxy for the FPL API
 ├── scripts/backtest.js     # Model accuracy backtest (`npm run backtest`)
 ├── data/accuracy.json      # Latest backtest results (refreshed daily)

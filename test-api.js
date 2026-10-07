@@ -111,6 +111,39 @@ const tests = [
         if (plan.gain < 0) throw new Error(`plan worse than rolling: ${plan.gain}`);
         return `+${first.gain} pts, with lock/ban +${plan.gain}`;
     }],
+    ['Optimizer: Wildcard / Free Hit squads are valid and beat your squad', async () => {
+        const team = await FPL_API.getTeamComposition();
+        const players = await FPL_API.getAllPlayers();
+        const report = await Predictor.getSquadReport(team.picks, players, team.entryHistory.bank / 10);
+        for (const [name, result] of [['wildcard', report.wildcard], ['free hit', report.freeHit]]) {
+            if (!result) throw new Error(`no ${name} squad`);
+            const squad = result.squad.map(pr => pr.player);
+            const shape = { GKP: 0, DEF: 0, MID: 0, FWD: 0 };
+            for (const p of squad) shape[p.position]++;
+            if (squad.length !== 15 || shape.GKP !== 2 || shape.DEF !== 5 || shape.MID !== 5 || shape.FWD !== 3) throw new Error(`${name}: shape ${JSON.stringify(shape)}`);
+            if (new Set(squad.map(p => p.id)).size !== 15) throw new Error(`${name}: duplicate player`);
+            if (result.cost > report.budget + 1e-9) throw new Error(`${name}: £${result.cost}m over £${report.budget}m`);
+            const perClub = {};
+            for (const p of squad) perClub[p.teamId] = (perClub[p.teamId] || 0) + 1;
+            if (Math.max(...Object.values(perClub)) > 3) throw new Error(`${name}: club limit`);
+            if (result.gain < -1e-9) throw new Error(`${name} worse than your squad (${result.gain})`);
+        }
+        if (!(report.rating > 0 && report.rating <= 100)) throw new Error(`rating ${report.rating}`);
+        return `rating ${report.rating}, wildcard +${report.wildcard.gain.toFixed(1)}, free hit +${report.freeHit.gain.toFixed(1)}`;
+    }],
+    ['Optimizer: chip calendar', async () => {
+        const team = await FPL_API.getTeamComposition();
+        const players = await FPL_API.getAllPlayers();
+        const cal = await Predictor.getChipCalendar(team.picks, players, team.entryHistory.bank / 10);
+        if (!cal) return 'no open chip window';
+        for (const w of cal.weeks) {
+            if (w.bboost < 0 || w['3xc'] < 0 || (w.freehit !== null && w.freehit < -1e-9)) throw new Error(`GW${w.gameweek}: negative chip value`);
+        }
+        for (const [chip, gw] of Object.entries(cal.best)) {
+            if (!cal.available.includes(chip) || !cal.weeks.some(w => w.gameweek === gw)) throw new Error(`best ${chip} GW${gw}`);
+        }
+        return `${cal.weeks.length} weeks to GW${cal.deadline}, best ${JSON.stringify(cal.best)}`;
+    }],
     ['League: effective ownership adds up per rival', async () => {
         const leagues = await League.getMyLeagues();
         if (!leagues.length) return 'no leagues';
