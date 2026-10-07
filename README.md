@@ -205,8 +205,8 @@ fpl-analyzer/
 ├── league.js               # Mini-league effective ownership
 ├── live.js                 # Live points, provisional bonus, auto-subs, rank estimate
 ├── app.js                  # Home page cards
-├── kits.js                 # Kit colour picker (not loaded by any page at present)
-├── manifest.json, icon.svg, icon-generator.html   # Home-screen app manifest and icon
+├── manifest.json, icon.svg, icon-generator.html   # Home-screen app manifest and icon (source)
+├── apple-touch-icon.png, icon-192.png, icon-512.png  # Home-screen icons rendered from icon.svg
 ├── api/
 │   ├── proxy.js            # Serverless proxy for the FPL API (Vercel function)
 │   └── rank.js             # Live overall rank sample (CDN-cached 10 minutes)

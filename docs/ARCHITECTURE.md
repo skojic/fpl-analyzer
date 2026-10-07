@@ -46,7 +46,6 @@ The same modules (`fpl-api.js`, `prediction.js`, `live.js`) run in the browser a
 | `scripts/contrast.js` | Reads the tokens in `styles.css` and checks WCAG AA contrast pairs in both themes. It is also used by `npm test`. |
 | `scripts/check-odds-markets.js` | One-off check for anytime-goalscorer odds (about 2 credits); reports findings as GitHub annotations. |
 
-`kits.js` (kit colour picker) is still in the repository but no page loads it.
 
 ## Data files
 
