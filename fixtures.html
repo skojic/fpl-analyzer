@@ -59,6 +59,7 @@
     <script src="prediction.js"></script>
     <script>
         let ticker = null;
+        let alertHtml = '';
         let mode = 'attack';
         let span = 5;
 
@@ -94,6 +95,7 @@
                     ${[3, 5, 8].filter(n => n <= ticker.events.length).map(n => `<button class="fx-btn${span === n ? ' on' : ''}" onclick="span=${n}; render()">${n} GW</button>`).join('')}
                 </div>
                 <div class="stats-info" style="font-size:0.84em; line-height:1.6; margin-bottom:12px;">${t('fxExplain')}</div>
+                ${alertHtml}
                 <div class="fx-wrap"><table class="fx-table">
                     <tr><th>${t('colTeam')}</th>${ticker.events.map((id, i) => `<th style="${i < span ? '' : 'opacity:0.55;'}">GW${id}</th>`).join('')}<th class="fx-sum">Σ ${span}</th></tr>`;
             for (const row of rows) {
@@ -115,6 +117,8 @@
             const content = document.getElementById('fixtures-content');
             try {
                 ticker = await Predictor.getFixtureTicker(8);
+                const team = await FPL_API.getTeamComposition().catch(() => ({ picks: [] }));
+                alertHtml = UI.gameweekAlert(await Predictor.getSpecialGameweeks(team.picks), { link: false });
                 if (!ticker.events.length) {
                     content.innerHTML = `${UI.state('empty', t('fxNone'))}`;
                     return;

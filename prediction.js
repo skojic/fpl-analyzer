@@ -938,6 +938,36 @@ const Predictor = {
         return { available, used, deadline: stop, weeks, best };
     },
 
+    // ── Blank and double gameweeks ───────────────────────────────────────────
+    // Gameweeks in the context where a team plays twice or not at all, with the squad players affected,
+    // and matches postponed without a new date (they usually become doubles later)
+    specialGameweeks(ctx, fixtures, squad = []) {
+        const teamName = id => (ctx.teams[id] || {}).shortName || '?';
+        const weeks = [];
+        for (const gw of ctx.horizon) {
+            const count = id => ((ctx.fixturesByTeam[id] || {})[gw.id] || []).length;
+            const teams = ctx.bootstrap.teams.map(t => t.id);
+            const blank = teams.filter(id => count(id) === 0);
+            const double = teams.filter(id => count(id) > 1);
+            if (!blank.length && !double.length) continue;
+            weeks.push({
+                gameweek: gw.id,
+                blankTeams: blank.map(teamName),
+                doubleTeams: double.map(teamName),
+                yourBlank: squad.filter(p => blank.includes(p.teamId)).map(p => p.name),
+                yourDouble: squad.filter(p => double.includes(p.teamId)).map(p => p.name)
+            });
+        }
+        const postponed = fixtures.filter(f => f.event === null && !f.finished)
+            .map(f => `${teamName(f.team_h)} v ${teamName(f.team_a)}`);
+        return { weeks, postponed };
+    },
+
+    async getSpecialGameweeks(squad = [], count = 8) {
+        const [ctx, fixtures] = await Promise.all([this.getContext(count), FPL_API.getFixtures()]);
+        return this.specialGameweeks(ctx, fixtures, squad);
+    },
+
     // ── Multi-week transfer planner ──────────────────────────────────────────
     PLAN_BEAM: 12,          // plans kept after each gameweek
     PLAN_SHORTLIST: 10,     // players considered per position

@@ -21,6 +21,11 @@ const FPL_API = {
         entryPicks: {}
     },
 
+    // Empty every cache (a server function reuses this module between requests)
+    resetCache() {
+        this.cache = { bootstrap: null, teamData: null, fixtures: null, managerHistory: null, entryTransfers: null, playerDetails: {}, leagues: {}, entryPicks: {} };
+    },
+
     // Helper to build URL - uses the same-origin Vercel proxy (api/proxy.js) in browser, direct in Node.js
     buildUrl(endpoint) {
         if (!this.IS_BROWSER) return endpoint;

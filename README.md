@@ -67,6 +67,7 @@ Link to the APP: https://fpl-analyzer-eosin.vercel.app/
 - Live points for your team with **provisional bonus** from the bonus point system (matches the confirmed bonus exactly once it's added) and **automatic substitutions** once a starter's matches are over without him playing, plus vice-captain cover
 - **Live league table** for your classic leagues, including hits and chips, with places gained or lost since the gameweek started
 - Refreshes every minute while matches are on
+- **Overall rank**: FPL's official rank once the gameweek is processed; while it is live, an estimate from about 30 pages of the overall table and 150 managers' live scores (`api/rank.js`, shared by all visitors and refreshed every 10 minutes). Checked against official ranks after a gameweek: median error about 1–4%
 
 ### 💷 Price Changes
 - From FPL's own price predictor: each player's progress towards the next change (±100%), now and for tonight's change window
@@ -77,6 +78,10 @@ Link to the APP: https://fpl-analyzer-eosin.vercel.app/
 - **Effective ownership (EO)** among your rivals: 100% per starting owner, 200% per captain
 - **Threats** (players your rivals own and you don't), **differentials**, rivals' captains and the league template, each with the projected point swing for the next gameweek
 - **Overall top 1,000** as an extra option: their effective ownership is sampled once per gameweek by the daily data job
+
+### ⚠️ Blank and Double Gameweeks
+- A banner on Home and on the Fixture Analyser when a team plays twice or not at all in the next 8 gameweeks, listing your players affected, and matches postponed without a new date
+- Projections, the transfer plan, the optimizer and the chip calendar already count a double as two matches and a blank as zero
 
 ### 📅 Fixture Analyser
 - Next 8 gameweeks for every team, coloured by the model's expected goals (attack), clean-sheet chance (defence) or FPL difficulty
@@ -192,6 +197,7 @@ fpl-analyzer/
 ├── prices.html             # Price changes (FPL's price predictor)
 ├── optimizer.html          # AI team rating, Wildcard / Free Hit squads, chip calendar
 ├── api/proxy.js            # Vercel serverless proxy for the FPL API
+├── api/rank.js             # Sample for the live overall rank estimate (CDN-cached 10 min)
 ├── scripts/backtest.js     # Model accuracy backtest (`npm run backtest`)
 ├── scripts/build-data.js   # Recent form for every player + top-1,000 ownership
 ├── scripts/build-odds.js   # Bookmaker odds → expected goals (The Odds API, free tier)

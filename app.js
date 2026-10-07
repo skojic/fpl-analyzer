@@ -21,7 +21,8 @@ async function initializeApp() {
             loadFixturesCard(),
             loadOptimizerCard(),
             loadLiveCard(),
-            loadPricesCard()
+            loadPricesCard(),
+            loadGameweekAlert()
         ]);
     } catch (error) {
         console.error('Error initializing app:', error);
@@ -150,6 +151,18 @@ async function loadMyTeam() {
 
 
 
+
+// Blank / double gameweek banner above the cards (hidden when none are coming)
+async function loadGameweekAlert() {
+    const box = document.getElementById('gw-alert');
+    if (!box) return;
+    try {
+        if (appData.myTeam.length === 0) await loadMyTeam();
+        box.innerHTML = UI.gameweekAlert(await Predictor.getSpecialGameweeks(appData.myTeam));
+    } catch (error) {
+        console.error('Gameweek alert unavailable:', error.message);
+    }
+}
 
 // ── Home cards below: each shows a few key numbers; the full page has the rest ──
 
@@ -329,10 +342,12 @@ async function loadLiveCard() {
         const byId = new Map(allPlayers.map(p => [p.id, p]));
         const status = gw.inProgress ? t('lvInProgress') : gw.finished ? t('lvFinished') : gw.started ? t('lvBetween') : t('lvNotStarted');
         const top = mine.rows.filter(r => r.multiplier > 0).sort((a, b) => b.points * b.multiplier - a.points * a.multiplier).slice(0, 3);
+        const rank = await Live.overallRank(gw, mine, await FPL_API.getEntryPicks(FPL_API.TEAM_ID, gw.gameweek));
 
         content.innerHTML = `<div class="ui-meta">GW${gw.gameweek} · ${status}</div>`
             + UI.stats([
                 [`${mine.points}${mine.hits ? ` −${mine.hits}` : ''}`, t('lvPoints')],
+                [UI.rankText(rank), rank && !rank.official ? t('lvOverallEst') : t('lvOverall')],
                 [me ? `${me.liveRank} / ${table.length}` : '–', leagues.length ? UI.esc(leagues[0].name) : t('leagueRank')]
             ])
             + top.map(r => {

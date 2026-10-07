@@ -90,6 +90,27 @@ const UI = {
         return `<div class="ui-state ui-state-${kind}" role="${kind === 'error' ? 'alert' : 'status'}"><span class="ui-state-icon" aria-hidden="true">${icon}</span><div>${message}${retry}</div></div>`;
     },
 
+    // "≈ 1,234,567" / "1,234,567" with a coloured arrow for the change since the last gameweek
+    rankText(info) {
+        if (!info || !info.rank) return '–';
+        const move = info.before ? info.before - info.rank : 0;
+        const arrow = move > 0 ? ` <span class="ui-up">▲${move.toLocaleString()}</span>` : move < 0 ? ` <span class="ui-down">▼${(-move).toLocaleString()}</span>` : '';
+        return `${info.official ? '' : '≈ '}${info.rank.toLocaleString()}${arrow}`;
+    },
+
+    // Banner for upcoming blank / double gameweeks and postponed matches (empty when there are none)
+    gameweekAlert(special, { link = true } = {}) {
+        if (!special || (!special.weeks.length && !special.postponed.length)) return '';
+        const yours = names => (names.length ? ` — ${t('alertYours').replace('{n}', names.length)}: ${names.map(UI.esc).join(', ')}` : '');
+        const lines = special.weeks.flatMap(w => [
+            w.doubleTeams.length ? `<li><strong>GW${w.gameweek} ${t('alertDouble')}</strong>: ${w.doubleTeams.join(', ')}${yours(w.yourDouble)}</li>` : '',
+            w.blankTeams.length ? `<li><strong>GW${w.gameweek} ${t('alertBlank')}</strong>: ${w.blankTeams.join(', ')}${yours(w.yourBlank)}</li>` : ''
+        ]).filter(Boolean);
+        if (special.postponed.length) lines.push(`<li>${t('alertPostponed').replace('{n}', special.postponed.length)}: ${special.postponed.join(', ')}</li>`);
+        return `<div class="ui-alert" role="status">${UI.icon('calendar')}<div><strong>${t('alertTitle')}</strong><ul>${lines.join('')}</ul>
+            ${link ? `<a href="fixtures.html">${t('cardFixtures')} →</a>` : ''}</div></div>`;
+    },
+
     // Small heading inside a card
     subtitle(text) {
         return `<h4 class="card-subtitle">${text}</h4>`;

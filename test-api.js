@@ -233,6 +233,47 @@ const tests = [
         if (failed.length) throw new Error(failed.map(r => `${r.theme} ${r.what}: ${r.ratio} < ${r.min}`).join('; '));
         return `${Contrast.check().length} pairs`;
     }],
+    ['Live: overall rank estimate matches official ranks after the gameweek', async () => {
+        const gw = await Live.getGameweek();
+        if (!gw.finished) return `GW${gw.gameweek} still in progress, skipped`;
+        const sample = await Live.buildRankSample(gw);
+        const entries = new Set([FPL_API.TEAM_ID]);
+        for (const page of [3, 400, 20000, 100000, 180000]) {
+            (await FPL_API.getLeagueStandings(314, page)).standings.results.slice(0, 3).forEach(r => entries.add(r.entry));
+        }
+        const errors = [];
+        for (const entry of entries) {
+            const picks = await FPL_API.getEntryPicks(entry, gw.gameweek);
+            const official = picks.entry_history.overall_rank;
+            const estimate = Live.estimateRank(sample, Live.scorePicks(picks, gw).total);
+            errors.push(Math.abs(estimate / official - 1));
+        }
+        errors.sort((a, b) => a - b);
+        const median = errors[Math.floor(errors.length / 2)];
+        if (median > 0.05) throw new Error(`median error ${(median * 100).toFixed(1)}%`);
+        return `${errors.length} managers, median error ${(median * 100).toFixed(1)}%, worst ${(errors[errors.length - 1] * 100).toFixed(1)}%`;
+    }],
+    ['Model: blank and double gameweeks are detected and projected', async () => {
+        const [bootstrap, fixtures] = await Promise.all([FPL_API.getBootstrapStatic(), FPL_API.getFixtures()]);
+        const next = bootstrap.events.find(e => e.is_next);
+        if (!next) return 'season over';
+        // Simulate: move one match of the next gameweek two weeks later -> blank now, double then
+        const moved = fixtures.find(f => f.event === next.id);
+        const later = next.id + 2;
+        const simulated = fixtures.map(f => (f === moved ? { ...f, event: later } : f));
+        const ctx = Predictor.buildContext(bootstrap, simulated, null, 5);
+        const players = await FPL_API.getAllPlayers();
+        const home = players.find(p => p.teamId === moved.team_h && p.status === 'a' && p.minutes > 300);
+        const result = Predictor.specialGameweeks(ctx, simulated, [home]);
+        const blankWeek = result.weeks.find(w => w.gameweek === next.id);
+        const doubleWeek = result.weeks.find(w => w.gameweek === later);
+        if (!blankWeek || blankWeek.blankTeams.length !== 2 || !blankWeek.yourBlank.includes(home.name)) throw new Error('blank not detected');
+        if (!doubleWeek || doubleWeek.doubleTeams.length !== 2 || !doubleWeek.yourDouble.includes(home.name)) throw new Error('double not detected');
+        const pr = Predictor.projectPlayerSync(home, ctx);
+        if (pr.perGW[0] !== 0) throw new Error(`blank week projects ${pr.perGW[0]}`);
+        if (pr.fixtures.filter(f => f.event === later).length !== 2) throw new Error('double week should have two fixtures');
+        return `${home.name}: GW${next.id} blank 0 pts, GW${later} double ${pr.perGW[2].toFixed(1)} pts`;
+    }],
     ['Model: return date parsing', async () => {
         const d = Predictor.parseReturnDate('Hamstring injury - Expected back 18 Oct');
         if (!d || d.getUTCDate() !== 18 || d.getUTCMonth() !== 9) throw new Error(`got ${d}`);

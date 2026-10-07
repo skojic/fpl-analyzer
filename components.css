@@ -331,3 +331,37 @@ input:focus-visible,
     .page .container > header { padding: 46px 16px 16px; }
     .page .container > header h1 { font-size: 1.5em; }
 }
+
+/* ── Alert banner (blank / double gameweeks) ─────────────────────────────── */
+.ui-alert {
+    display: flex;
+    gap: var(--space-3);
+    align-items: flex-start;
+    padding: var(--space-3) var(--space-4);
+    margin-bottom: var(--space-4);
+    border-radius: var(--radius);
+    border: 1.5px solid var(--warning);
+    background: var(--card-bg);
+    color: var(--text-color);
+    font-size: var(--fs-sm);
+    line-height: 1.5;
+}
+.ui-alert > .ui-icon { color: var(--warning); width: 22px; height: 22px; margin-top: 2px; }
+.ui-alert ul { margin: var(--space-1) 0; padding-left: 18px; }
+.ui-alert a { color: var(--positive); font-weight: 800; text-decoration: none; }
+
+/* ── Compact Home banner: team name, logo, language / theme and Change ID in a slimmer header ── */
+body:not(.page) .container > header { padding: 30px 32px 26px; margin-bottom: var(--space-5); }
+body:not(.page) .container > header h1 { font-size: 2.3em; margin-bottom: 0; }
+body:not(.page) .container > header .header-eyebrow { margin-bottom: 4px; }
+@media (max-width: 768px) {
+    body:not(.page) .container > header { padding: 48px 16px 34px; }
+    body:not(.page) .container > header h1 { font-size: 1.6em; }
+}
+.stat-card-value .ui-up,
+.stat-card-value .ui-down { display: block; font-size: 0.5em; }
+
+/* Stat tiles: rows fill evenly (no orphan tile), readable gains / losses on the purple tiles */
+.stats-grid.ui-stats { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+.stat-card .ui-up { color: var(--secondary-color); }
+.stat-card .ui-down { color: #ff8fb1; }
