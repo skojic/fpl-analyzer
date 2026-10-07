@@ -41,6 +41,17 @@
     <script src="prediction.js"></script>
     <script>
 
+        // How much the bookmaker odds help, once matches with saved odds have been played
+        function oddsCalibrationText(cal) {
+            const part = (c, label) => c && c.gameweeks.length
+                ? t('accOddsResult').replace('{what}', label).replace('{range}', `GW${c.gameweeks.join(', ')}`)
+                    .replace('{model}', c.modelOnly.mae.toFixed(2)).replace('{best}', `${Math.round(c.best * 100)}%`)
+                    .replace('{mae}', c.weights[String(c.best)].mae.toFixed(2))
+                : '';
+            const text = [part(cal && cal.odds, t('accOddsMatch')), part(cal && cal.market, t('accOddsRatings'))].filter(Boolean).join(' ');
+            return text || t('accOddsPending');
+        }
+
         // Backtest results published by scripts/backtest.js (refreshed by the daily data job)
         async function accuracyHtml() {
             try {
@@ -59,6 +70,7 @@
                             ${row(t('accModel'), o.model)}${row(t('accPPG'), o.baselinePPG)}${row(t('accForm'), o.baselineForm)}
                         </table>
                         ${t('accTop10').replace('{model}', o.top10Actual.model).replace('{form}', o.top10Actual.form)}
+                        <p>${oddsCalibrationText(acc.oddsCalibration)}</p>
                     </div>`;
             } catch (error) {
                 return '';

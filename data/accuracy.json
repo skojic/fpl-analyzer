@@ -1,5 +1,19 @@
 {
-  "generated": "2026-10-07T10:13:52.823Z",
+  "generated": "2026-10-07T12:07:53.032Z",
+  "oddsCalibration": {
+    "odds": {
+      "gameweeks": [],
+      "weights": {},
+      "modelOnly": null,
+      "best": null
+    },
+    "market": {
+      "gameweeks": [],
+      "weights": {},
+      "modelOnly": null,
+      "best": null
+    }
+  },
   "note": "Projections rebuilt from match history before each gameweek; everyone treated as available.",
   "overall": {
     "model": {
@@ -32,6 +46,7 @@
   "gameweeks": [
     {
       "gameweek": 2,
+      "variants": {},
       "model": {
         "n": 364,
         "mae": 2.021,
@@ -61,6 +76,7 @@
     },
     {
       "gameweek": 3,
+      "variants": {},
       "model": {
         "n": 387,
         "mae": 1.816,
@@ -90,6 +106,7 @@
     },
     {
       "gameweek": 4,
+      "variants": {},
       "model": {
         "n": 406,
         "mae": 1.944,
@@ -119,6 +136,7 @@
     },
     {
       "gameweek": 5,
+      "variants": {},
       "model": {
         "n": 421,
         "mae": 1.829,

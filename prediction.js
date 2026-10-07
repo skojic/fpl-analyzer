@@ -108,6 +108,8 @@ const Predictor = {
     PRIOR_GAMES: 6,         // team ratings: weight (in matches) of FPL's strength rating vs this season's xG
     PRIOR_MINUTES: 270,     // player rates: minutes of position-average data blended into per-90 stats
     ODDS_WEIGHT: 0.7,       // weight of bookmaker odds vs the team ratings for matches that have odds
+    MARKET_WEIGHT: 0.5,     // weight of bookmaker team ratings for matches that don't have odds yet
+    MARKET_PRIOR_MATCHES: 1, // bookmaker ratings: the model's own rating counts as this many matches
     ODDS_MAX_AGE_DAYS: 4,   // odds older than this are ignored
     RECENT_MATCHES: 5,      // matches of element-summary history used for the minutes model
     START_MINUTES: 85,      // typical minutes for a starter
@@ -123,10 +125,36 @@ const Predictor = {
     async getContext(length = this.HORIZON) {
         if (this.contexts[length]) return this.contexts[length];
 
-        const [bootstrap, fixtures, odds] = await Promise.all([FPL_API.getBootstrapStatic(), FPL_API.getFixtures(), this.loadOdds()]);
+        const [bootstrap, fixtures, odds] = await Promise.all([FPL_API.getBootstrapStatic(), FPL_API.getFixtures(), this.loadOdds(), this.loadSettings()]);
         await this.loadPublishedForm(bootstrap);
         this.contexts[length] = this.buildContext(bootstrap, fixtures, null, length, odds);
         return this.contexts[length];
+    },
+
+    // Odds weights measured by the backtest (data/model-settings.json), used once enough gameweeks are measured
+    async loadSettings() {
+        if (this.settingsPromise) return this.settingsPromise;
+        this.settingsPromise = (async () => {
+            try {
+                let data;
+                if (FPL_API.IS_BROWSER) {
+                    const response = await fetch('data/model-settings.json', { cache: 'no-cache' });
+                    if (!response.ok) return;
+                    data = await response.json();
+                } else {
+                    const file = require('path').join(__dirname, 'data', 'model-settings.json');
+                    if (!require('fs').existsSync(file)) return;
+                    data = JSON.parse(require('fs').readFileSync(file, 'utf8'));
+                }
+                const measured = data.measuredGameweeks || {};
+                if (measured.odds >= data.minGameweeks) this.ODDS_WEIGHT = data.oddsWeight;
+                if (measured.market >= data.minGameweeks) this.MARKET_WEIGHT = data.marketWeight;
+                this.dataInfo.settings = data;
+            } catch (error) {
+                console.error('Model settings unavailable:', error.message);
+            }
+        })();
+        return this.settingsPromise;
     },
 
     // Bookmaker odds per fixture, published by scripts/build-odds.js (empty when missing or stale)
@@ -158,7 +186,9 @@ const Predictor = {
 
     // Context from raw bootstrap + fixtures. `nextEventId` overrides the next gameweek
     // (the backtest rebuilds the season as it stood before a past gameweek).
-    buildContext(bootstrap, fixtures, nextEventId = null, length = this.HORIZON, odds = {}) {
+    // `odds` are used directly for their matches; `marketOdds` (by default the same) set bookmaker
+    // team ratings for every other match.
+    buildContext(bootstrap, fixtures, nextEventId = null, length = this.HORIZON, odds = {}, marketOdds = odds) {
         // Horizon: the next N gameweeks (transfers made now count from the next deadline)
         const next = nextEventId ? bootstrap.events.find(e => e.id === nextEventId) : bootstrap.events.find(e => e.is_next);
         const horizon = next
@@ -246,7 +276,52 @@ const Predictor = {
             };
         }
 
-        return { bootstrap, horizon, fixturesByTeam, teamGames, teams, leagueAvg, positionRates, odds };
+        const ctx = { bootstrap, horizon, fixturesByTeam, teamGames, teams, leagueAvg, positionRates, odds };
+        ctx.market = this.fitMarketRatings(marketOdds, ctx);
+        return ctx;
+    },
+
+    // Team attack / defence as the bookmakers see them, from the expected goals of the priced matches.
+    // Same shape as the model: home goals = league avg x home attack x away defence x home advantage.
+    // Fitted on log scale; each team's model rating counts as MARKET_PRIOR_MATCHES extra matches, so a
+    // team with one or two priced matches moves only part of the way.
+    fitMarketRatings(odds, ctx) {
+        const games = Object.values(odds || {}).filter(o => ctx.teams[o.home] && ctx.teams[o.away] && o.goalsHome > 0 && o.goalsAway > 0);
+        if (games.length < 5) return null;
+        const logL = Math.log(ctx.leagueAvg);
+        const logH = Math.log(this.HOME_ADVANTAGE);
+        const lam = this.MARKET_PRIOR_MATCHES;
+        const ids = Object.keys(ctx.teams).map(Number);
+        const prior = Object.fromEntries(ids.map(id => [id, { a: Math.log(ctx.teams[id].attack), d: Math.log(ctx.teams[id].defence) }]));
+        const a = Object.fromEntries(ids.map(id => [id, prior[id].a]));
+        const d = Object.fromEntries(ids.map(id => [id, prior[id].d]));
+
+        for (let iteration = 0; iteration < 60; iteration++) {
+            for (const id of ids) {
+                let attack = lam * prior[id].a;
+                let defence = lam * prior[id].d;
+                let n = lam;
+                for (const g of games) {
+                    if (g.home === id) {
+                        attack += Math.log(g.goalsHome) - logL - d[g.away] - logH;
+                        defence += Math.log(g.goalsAway) - logL - a[g.away] + logH;
+                        n++;
+                    } else if (g.away === id) {
+                        attack += Math.log(g.goalsAway) - logL - d[g.home] + logH;
+                        defence += Math.log(g.goalsHome) - logL - a[g.home] - logH;
+                        n++;
+                    }
+                }
+                a[id] = attack / n;
+                d[id] = defence / n;
+            }
+        }
+        const market = {};
+        for (const id of ids) {
+            const matches = games.filter(g => g.home === id || g.away === id).length;
+            if (matches) market[id] = { attack: Math.exp(a[id]), defence: Math.exp(d[id]), matches };
+        }
+        return market;
     },
 
     // ── Minutes model ────────────────────────────────────────────────────────
@@ -369,19 +444,32 @@ const Predictor = {
     // Goals a team is expected to score and concede in a fixture: team ratings with home advantage,
     // blended with the bookmakers' expected goals when odds are published for the match
     fixtureGoals(teamId, opponentId, isHome, fixtureId, ctx) {
-        const own = ctx.teams[teamId];
-        const opp = ctx.teams[opponentId];
         const home = isHome ? this.HOME_ADVANTAGE : 1 / this.HOME_ADVANTAGE;
-        let scored = ctx.leagueAvg * own.attack * opp.defence * home;
-        let conceded = ctx.leagueAvg * opp.attack * own.defence / home;
-        const market = (ctx.odds || {})[fixtureId];
-        if (market) {
-            const [oddsFor, oddsAgainst] = isHome ? [market.goalsHome, market.goalsAway] : [market.goalsAway, market.goalsHome];
-            const blend = (model, odds) => Math.pow(model, 1 - this.ODDS_WEIGHT) * Math.pow(odds, this.ODDS_WEIGHT);
-            scored = blend(scored, oddsFor);
-            conceded = blend(conceded, oddsAgainst);
+        const blend = (model, odds, w) => Math.pow(model, 1 - w) * Math.pow(odds, w);
+        const odds = (ctx.odds || {})[fixtureId];
+
+        // Matches with odds: the model's ratings blended with that match's odds
+        if (odds) {
+            const own = ctx.teams[teamId];
+            const opp = ctx.teams[opponentId];
+            const [oddsFor, oddsAgainst] = isHome ? [odds.goalsHome, odds.goalsAway] : [odds.goalsAway, odds.goalsHome];
+            return {
+                scored: blend(ctx.leagueAvg * own.attack * opp.defence * home, oddsFor, this.ODDS_WEIGHT),
+                conceded: blend(ctx.leagueAvg * opp.attack * own.defence / home, oddsAgainst, this.ODDS_WEIGHT),
+                fromOdds: true,
+                fromMarket: false
+            };
         }
-        return { scored, conceded, fromOdds: !!market };
+
+        // Other matches: team ratings, moved towards the bookmakers' view of each team where known
+        const market = ctx.market || {};
+        const rating = (id, key) => (market[id] ? blend(ctx.teams[id][key], market[id][key], this.MARKET_WEIGHT) : ctx.teams[id][key]);
+        return {
+            scored: ctx.leagueAvg * rating(teamId, 'attack') * rating(opponentId, 'defence') * home,
+            conceded: ctx.leagueAvg * rating(opponentId, 'attack') * rating(teamId, 'defence') / home,
+            fromOdds: false,
+            fromMarket: !!(market[teamId] || market[opponentId])
+        };
     },
 
     // ── Points for one fixture, given he is available ───────────────────────

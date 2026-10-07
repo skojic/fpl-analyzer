@@ -123,6 +123,7 @@ function buildOdds(events, bootstrap, fixtures) {
         const round = x => Math.round(x * 1000) / 1000;
         out[fixture.id] = {
             event: fixture.event,
+            kickoff: fixture.kickoff_time,
             home: fixture.team_h,
             away: fixture.team_a,
             goalsHome: round(goals.home),
@@ -135,6 +136,24 @@ function buildOdds(events, bootstrap, fixtures) {
         };
     }
     return { fixtures: out, unmatched };
+}
+
+// Keep the latest odds taken before kickoff for every match (data/odds-history.json). Matches leave the
+// bookmakers' list once they start, so what remains is the last pre-match price. The backtest uses it
+// to measure how much weight the odds deserve.
+function updateHistory(matched, now = new Date()) {
+    const file = path.join(root, 'data', 'odds-history.json');
+    let history = { fixtures: {} };
+    try { history = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { /* first run */ }
+    let updated = 0;
+    for (const [id, odds] of Object.entries(matched)) {
+        if (!odds.kickoff || new Date(odds.kickoff) <= now) continue; // in-play prices are not pre-match odds
+        history.fixtures[id] = { ...odds, takenAt: now.toISOString() };
+        updated++;
+    }
+    history.generated = now.toISOString();
+    fs.writeFileSync(file, JSON.stringify(history) + '\n');
+    return `data/odds-history.json: ${updated} matches updated, ${Object.keys(history.fixtures).length} kept`;
 }
 
 async function main() {
@@ -163,6 +182,7 @@ async function main() {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, JSON.stringify({ generated: new Date().toISOString(), source: 'the-odds-api.com', fixtures: matched }) + '\n');
     log('data/odds.json written');
+    log(updateHistory(matched));
 }
 
 if (require.main === module) {
@@ -172,4 +192,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { teamKey, consensus, expectedGoals, buildOdds, pOver25, outcome };
+module.exports = { teamKey, consensus, expectedGoals, buildOdds, updateHistory, pOver25, outcome };

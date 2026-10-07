@@ -291,6 +291,42 @@ const tests = [
         if (s.gain < -1e-9) throw new Error(`suggestion worse than current lineup (${s.gain})`);
         return `GW${s.gameweek}: ${s.points.toFixed(1)} xPts (+${s.gain.toFixed(1)}), C ${captain.name}, bench ${s.bench.map(p => p.name).join(', ')}`;
     }],
+    ['Odds: bookmaker team ratings are recovered and used for unpriced matches', async () => {
+        const [bootstrap, fixtures] = await Promise.all([FPL_API.getBootstrapStatic(), FPL_API.getFixtures()]);
+        const base = Predictor.buildContext(bootstrap, fixtures, null, 5, {});
+        // Made-up "true" strengths, and odds-implied goals that follow them exactly, for the next 3 gameweeks
+        const truth = {};
+        bootstrap.teams.forEach((t, i) => { truth[t.id] = { attack: 0.8 + 0.4 * ((i * 7) % 20) / 19, defence: 0.8 + 0.4 * ((i * 11) % 20) / 19 }; });
+        const H = Predictor.HOME_ADVANTAGE;
+        const gws = base.horizon.slice(0, 3).map(g => g.id);
+        const odds = {};
+        for (const f of fixtures.filter(x => gws.includes(x.event))) {
+            odds[f.id] = { event: f.event, home: f.team_h, away: f.team_a,
+                goalsHome: base.leagueAvg * truth[f.team_h].attack * truth[f.team_a].defence * H,
+                goalsAway: base.leagueAvg * truth[f.team_a].attack * truth[f.team_h].defence / H };
+        }
+        const saved = Predictor.MARKET_PRIOR_MATCHES;
+        Predictor.MARKET_PRIOR_MATCHES = 0.01; // almost no pull to the model: the fit should find the truth
+        const ctx = Predictor.buildContext(bootstrap, fixtures, null, 5, {}, odds);
+        Predictor.MARKET_PRIOR_MATCHES = saved;
+        // Attack and defence are only identified up to a common factor: compare products, as the model uses them
+        let worst = 0;
+        for (const f of Object.values(odds)) {
+            const fit = ctx.market[f.home].attack * ctx.market[f.away].defence;
+            const real = truth[f.home].attack * truth[f.away].defence;
+            worst = Math.max(worst, Math.abs(fit / real - 1));
+        }
+        if (worst > 0.02) throw new Error(`fit off by ${(worst * 100).toFixed(1)}%`);
+
+        // An unpriced later match moves towards the bookmaker view
+        const later = fixtures.find(f => f.event === base.horizon[4].id);
+        const plain = Predictor.fixtureGoals(later.team_h, later.team_a, true, later.id, base);
+        const withMarket = Predictor.fixtureGoals(later.team_h, later.team_a, true, later.id, ctx);
+        const target = base.leagueAvg * truth[later.team_h].attack * truth[later.team_a].defence * H;
+        const between = (x, lo, hi) => x >= Math.min(lo, hi) - 1e-9 && x <= Math.max(lo, hi) + 1e-9;
+        if (!withMarket.fromMarket || !between(withMarket.scored, plain.scored, target)) throw new Error('unpriced match not moved towards the market');
+        return `fit within ${(worst * 100).toFixed(2)}% on ${Object.keys(odds).length} matches; GW${later.event} home xG ${plain.scored.toFixed(2)} -> ${withMarket.scored.toFixed(2)}`;
+    }],
     ['Model: return date parsing', async () => {
         const d = Predictor.parseReturnDate('Hamstring injury - Expected back 18 Oct');
         if (!d || d.getUTCDate() !== 18 || d.getUTCMonth() !== 9) throw new Error(`got ${d}`);

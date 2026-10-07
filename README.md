@@ -290,7 +290,7 @@ Code: `prediction.js`. Projections cover the next 5 gameweeks from the next dead
    - Goals conceded (GKP/DEF): −1 per 2, saves (GKP): 1 per 3, both as Poisson expectations
    - Defensive contribution: 2 points × P(reaching 10 actions for DEF, 12 for MID/FWD)
    - Bonus from his own bonus rate, yellow cards −1
-6. **Bookmaker odds** (when published): for upcoming matches, the daily job turns each match's 1X2 and over/under 2.5 odds (margin removed, averaged over bookmakers) into expected goals for both teams with the same Poisson model; these are blended with the team ratings (70% odds) for goals, assists, clean sheets, goals conceded and saves. Matches without odds use the ratings alone
+6. **Bookmaker odds** (when published): for upcoming matches, the daily job turns each match's 1X2 and over/under 2.5 odds (margin removed, averaged over bookmakers) into expected goals for both teams with the same Poisson model; these are blended with the team ratings (70% odds) for goals, assists, clean sheets, goals conceded and saves. Matches without odds use team ratings moved towards the bookmakers' view: each team's attack and defence are fitted to the expected goals of all priced matches (the model's own rating counts as one extra match) and blended in at 50%. Pre-kickoff odds are saved for every match (`data/odds-history.json`); after two gameweeks the backtest measures the best weights for both (including 0 = don't use) and writes them to `data/model-settings.json`, which the app then uses
 7. **Squad value**: best valid XI (1 GKP, 3–5 DEF, 2–5 MID, 1–3 FWD) plus captain for each gameweek, with each gameweek weighted 0.9× the one before
 
 ## Browser Compatibility

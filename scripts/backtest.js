@@ -5,6 +5,7 @@
 // model given availability, the same way for the model and the baselines.
 //
 // Usage: node scripts/backtest.js [output.json]     (default: data/accuracy.json)
+//        ODDS_HISTORY=... SETTINGS_OUT=... override the odds history read and the settings written
 const fs = require('fs');
 const path = require('path');
 
@@ -14,6 +15,15 @@ const Predictor = require(path.join(root, 'prediction.js'));
 
 const quiet = console.log;
 console.log = () => {};
+
+// Odds calibration: weights tried, and how many measured gameweeks before the app uses the result
+const ODDS_GRID = [0, 0.3, 0.5, 0.7, 0.9];      // 0 = don't use the odds
+const MARKET_GRID = [0, 0.3, 0.5, 0.7];
+const MIN_GAMEWEEKS = 2;
+
+function readJson(file, fallback) {
+    try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { return fallback; }
+}
 
 const SUM_FIELDS = ['minutes', 'starts', 'saves', 'bonus', 'bps', 'yellow_cards', 'red_cards', 'goals_scored', 'assists',
     'clean_sheets', 'goals_conceded', 'defensive_contribution', 'total_points', 'tackles', 'recoveries', 'clearances_blocks_interceptions'];
@@ -68,6 +78,10 @@ async function main() {
         }
     }));
 
+    // Last pre-kickoff odds per match, saved daily by scripts/build-odds.js
+    const oddsHistory = readJson(process.env.ODDS_HISTORY || path.join(root, 'data', 'odds-history.json'), { fixtures: {} }).fixtures;
+    const oddsFor = event => Object.fromEntries(Object.entries(oddsHistory).filter(([, o]) => o.event === event).map(([id, o]) => [id, o]));
+
     const results = [];
     for (const g of gameweeks) {
         // Season as it stood before gameweek g
@@ -105,6 +119,7 @@ async function main() {
             const rate = before.length ? appearances / before.length : 0;
             rows.push({
                 id: raw.id,
+                player,
                 projected,
                 actual,
                 ppg: ppg * rate * fixturesInGW.length,
@@ -112,8 +127,30 @@ async function main() {
             });
         }
 
+        // Odds variants: this gameweek's odds at several weights, and bookmaker team ratings fitted
+        // from the previous gameweek's odds (as used for weeks that aren't priced yet)
+        const variants = {};
+        const evaluate = c => stats(rows.map(r => [Predictor.projectPlayerSync(r.player, c).perGW[0] || 0, r.actual]));
+        const [savedOdds, savedMarket] = [Predictor.ODDS_WEIGHT, Predictor.MARKET_WEIGHT];
+        const oddsNow = oddsFor(g);
+        const oddsBefore = oddsFor(g - 1);
+        if (Object.keys(oddsNow).length >= 5) {
+            for (const w of ODDS_GRID) {
+                Predictor.ODDS_WEIGHT = w;
+                variants[`odds:${w}`] = evaluate(Predictor.buildContext(asOf, fixturesAsOf, g, 1, oddsNow, {}));
+            }
+        }
+        if (Object.keys(oddsBefore).length >= 5) {
+            for (const w of MARKET_GRID) {
+                Predictor.MARKET_WEIGHT = w;
+                variants[`market:${w}`] = evaluate(Predictor.buildContext(asOf, fixturesAsOf, g, 1, {}, oddsBefore));
+            }
+        }
+        [Predictor.ODDS_WEIGHT, Predictor.MARKET_WEIGHT] = [savedOdds, savedMarket];
+
         results.push({
             gameweek: g,
+            variants,
             model: stats(rows.map(r => [r.projected, r.actual])),
             baselinePPG: stats(rows.map(r => [r.ppg, r.actual])),
             baselineForm: stats(rows.map(r => [r.form, r.actual])),
@@ -128,8 +165,38 @@ async function main() {
         return { n, mae: w('mae'), rmse: w('rmse'), corr: w('corr'), bias: w('bias') };
     };
     const avgTop = key => Math.round((results.reduce((s, r) => s + r.top10Actual[key], 0) / results.length) * 100) / 100;
+    // Odds calibration across the gameweeks that have saved odds
+    const calibrate = prefix => {
+        const gws = results.filter(r => Object.keys(r.variants).some(k => k.startsWith(prefix)));
+        if (!gws.length) return { gameweeks: [], weights: {}, modelOnly: null, best: null };
+        const pool = list => {
+            const n = list.reduce((s, x) => s + x.n, 0);
+            const w = f => Math.round((list.reduce((s, x) => s + x[f] * x.n, 0) / n) * 1000) / 1000;
+            return { n, mae: w('mae'), corr: w('corr') };
+        };
+        const keys = Object.keys(gws[0].variants).filter(k => k.startsWith(prefix));
+        const weights = Object.fromEntries(keys.map(k => [k.split(':')[1], pool(gws.map(r => r.variants[k]))]));
+        const best = Object.entries(weights).sort((a, b) => a[1].mae - b[1].mae)[0];
+        return { gameweeks: gws.map(r => r.gameweek), weights, modelOnly: pool(gws.map(r => r.model)), best: parseFloat(best[0]) };
+    };
+    const oddsCalibration = { odds: calibrate('odds:'), market: calibrate('market:') };
+
+    // Settings the app uses once enough gameweeks are measured
+    const settings = {
+        oddsWeight: oddsCalibration.odds.gameweeks.length >= MIN_GAMEWEEKS ? oddsCalibration.odds.best : Predictor.ODDS_WEIGHT,
+        marketWeight: oddsCalibration.market.gameweeks.length >= MIN_GAMEWEEKS ? oddsCalibration.market.best : Predictor.MARKET_WEIGHT,
+        measuredGameweeks: { odds: oddsCalibration.odds.gameweeks.length, market: oddsCalibration.market.gameweeks.length },
+        minGameweeks: MIN_GAMEWEEKS
+    };
+    const settingsFile = process.env.SETTINGS_OUT || path.join(root, 'data', 'model-settings.json');
+    const previousSettings = readJson(settingsFile, null);
+    if (!previousSettings || JSON.stringify({ ...previousSettings, generated: undefined }) !== JSON.stringify(settings)) {
+        fs.writeFileSync(settingsFile, JSON.stringify({ generated: new Date().toISOString(), ...settings }, null, 2) + '\n');
+    }
+
     const report = {
         generated: new Date().toISOString(),
+        oddsCalibration,
         note: 'Projections rebuilt from match history before each gameweek; everyone treated as available.',
         overall: {
             model: pooled('model'),
@@ -157,6 +224,12 @@ async function main() {
     quiet(line('Baseline form', report.overall.baselineForm));
     quiet(`Top-10 picks' actual points per GW: model ${report.overall.top10Actual.model}, PPG ${report.overall.top10Actual.ppg}, form ${report.overall.top10Actual.form}`);
     for (const r of results) quiet(`  GW${r.gameweek}: ${line('model', r.model)} | form MAE ${r.baselineForm.mae.toFixed(2)} | top-10 ${r.top10Actual.model} vs ${r.top10Actual.form}`);
+    for (const [name, c] of Object.entries(oddsCalibration)) {
+        quiet(c.gameweeks.length
+            ? `Odds calibration (${name}) on GW${c.gameweeks.join(', ')}: model only MAE ${c.modelOnly.mae}; ${Object.entries(c.weights).map(([w, x]) => `${w}: ${x.mae}`).join(', ')}; best ${c.best}`
+            : `Odds calibration (${name}): no gameweeks with saved odds yet`);
+    }
+    quiet(`Settings: odds weight ${settings.oddsWeight}, bookmaker-rating weight ${settings.marketWeight} (measured on ${settings.measuredGameweeks.odds} / ${settings.measuredGameweeks.market} gameweeks; used from ${MIN_GAMEWEEKS})`);
     quiet(changed ? `Saved ${path.relative(root, out)}` : 'Results unchanged, file not rewritten');
 }
 
