@@ -1,11 +1,43 @@
 {
-  "generated": "2026-10-07T12:07:53.032Z",
+  "generated": "2026-10-14T10:27:36.561Z",
   "oddsCalibration": {
     "odds": {
-      "gameweeks": [],
-      "weights": {},
-      "modelOnly": null,
-      "best": null
+      "gameweeks": [
+        6
+      ],
+      "weights": {
+        "0": {
+          "n": 436,
+          "mae": 1.77,
+          "corr": 0.317
+        },
+        "0.3": {
+          "n": 436,
+          "mae": 1.76,
+          "corr": 0.325
+        },
+        "0.5": {
+          "n": 436,
+          "mae": 1.754,
+          "corr": 0.331
+        },
+        "0.7": {
+          "n": 436,
+          "mae": 1.749,
+          "corr": 0.335
+        },
+        "0.9": {
+          "n": 436,
+          "mae": 1.745,
+          "corr": 0.34
+        }
+      },
+      "modelOnly": {
+        "n": 436,
+        "mae": 1.77,
+        "corr": 0.317
+      },
+      "best": 0.9
     },
     "market": {
       "gameweeks": [],
@@ -17,30 +49,30 @@
   "note": "Projections rebuilt from match history before each gameweek; everyone treated as available.",
   "overall": {
     "model": {
-      "n": 1578,
-      "mae": 1.9,
-      "rmse": 2.743,
-      "corr": 0.39,
-      "bias": -0.154
+      "n": 2014,
+      "mae": 1.872,
+      "rmse": 2.728,
+      "corr": 0.375,
+      "bias": -0.141
     },
     "baselinePPG": {
-      "n": 1578,
-      "mae": 2.145,
-      "rmse": 3.206,
-      "corr": 0.312,
-      "bias": 0.033
+      "n": 2014,
+      "mae": 2.088,
+      "rmse": 3.116,
+      "corr": 0.315,
+      "bias": 0.049
     },
     "baselineForm": {
-      "n": 1578,
-      "mae": 2.145,
-      "rmse": 3.206,
+      "n": 2014,
+      "mae": 2.089,
+      "rmse": 3.13,
       "corr": 0.312,
-      "bias": 0.033
+      "bias": 0.043
     },
     "top10Actual": {
-      "model": 4.33,
-      "ppg": 3.38,
-      "form": 3.38
+      "model": 4.02,
+      "ppg": 3.74,
+      "form": 3.2
     }
   },
   "gameweeks": [
@@ -162,6 +194,72 @@
         "model": 3.3,
         "ppg": 4.9,
         "form": 4.9
+      }
+    },
+    {
+      "gameweek": 6,
+      "variants": {
+        "odds:0": {
+          "n": 436,
+          "mae": 1.77,
+          "rmse": 2.672,
+          "corr": 0.317,
+          "bias": -0.093
+        },
+        "odds:0.3": {
+          "n": 436,
+          "mae": 1.76,
+          "rmse": 2.658,
+          "corr": 0.325,
+          "bias": -0.094
+        },
+        "odds:0.5": {
+          "n": 436,
+          "mae": 1.754,
+          "rmse": 2.65,
+          "corr": 0.331,
+          "bias": -0.094
+        },
+        "odds:0.7": {
+          "n": 436,
+          "mae": 1.749,
+          "rmse": 2.643,
+          "corr": 0.335,
+          "bias": -0.094
+        },
+        "odds:0.9": {
+          "n": 436,
+          "mae": 1.745,
+          "rmse": 2.637,
+          "corr": 0.34,
+          "bias": -0.093
+        }
+      },
+      "model": {
+        "n": 436,
+        "mae": 1.77,
+        "rmse": 2.672,
+        "corr": 0.317,
+        "bias": -0.093
+      },
+      "baselinePPG": {
+        "n": 436,
+        "mae": 1.884,
+        "rmse": 2.79,
+        "corr": 0.328,
+        "bias": 0.106
+      },
+      "baselineForm": {
+        "n": 436,
+        "mae": 1.887,
+        "rmse": 2.853,
+        "corr": 0.31,
+        "bias": 0.078
+      },
+      "top10Actual": {
+        "model": 2.8,
+        "ppg": 5.2,
+        "form": 2.5
       }
     }
   ]
