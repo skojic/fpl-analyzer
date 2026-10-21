@@ -1,78 +1,106 @@
 {
-  "generated": "2026-10-14T10:27:36.561Z",
+  "generated": "2026-10-21T10:27:24.625Z",
   "oddsCalibration": {
     "odds": {
       "gameweeks": [
-        6
+        6,
+        7
       ],
       "weights": {
         "0": {
-          "n": 436,
-          "mae": 1.77,
-          "corr": 0.317
+          "n": 885,
+          "mae": 1.728,
+          "corr": 0.391
         },
         "0.3": {
-          "n": 436,
-          "mae": 1.76,
-          "corr": 0.325
+          "n": 885,
+          "mae": 1.718,
+          "corr": 0.399
         },
         "0.5": {
-          "n": 436,
-          "mae": 1.754,
-          "corr": 0.331
+          "n": 885,
+          "mae": 1.713,
+          "corr": 0.404
         },
         "0.7": {
-          "n": 436,
-          "mae": 1.749,
-          "corr": 0.335
+          "n": 885,
+          "mae": 1.708,
+          "corr": 0.408
         },
         "0.9": {
-          "n": 436,
-          "mae": 1.745,
-          "corr": 0.34
+          "n": 885,
+          "mae": 1.704,
+          "corr": 0.413
         }
       },
       "modelOnly": {
-        "n": 436,
-        "mae": 1.77,
-        "corr": 0.317
+        "n": 885,
+        "mae": 1.728,
+        "corr": 0.391
       },
       "best": 0.9
     },
     "market": {
-      "gameweeks": [],
-      "weights": {},
-      "modelOnly": null,
-      "best": null
+      "gameweeks": [
+        7
+      ],
+      "weights": {
+        "0": {
+          "n": 449,
+          "mae": 1.687,
+          "corr": 0.463
+        },
+        "0.3": {
+          "n": 449,
+          "mae": 1.685,
+          "corr": 0.463
+        },
+        "0.5": {
+          "n": 449,
+          "mae": 1.684,
+          "corr": 0.464
+        },
+        "0.7": {
+          "n": 449,
+          "mae": 1.683,
+          "corr": 0.464
+        }
+      },
+      "modelOnly": {
+        "n": 449,
+        "mae": 1.687,
+        "corr": 0.463
+      },
+      "best": 0.7
     }
   },
   "note": "Projections rebuilt from match history before each gameweek; everyone treated as available.",
   "overall": {
     "model": {
-      "n": 2014,
-      "mae": 1.872,
-      "rmse": 2.728,
-      "corr": 0.375,
-      "bias": -0.141
+      "n": 2463,
+      "mae": 1.838,
+      "rmse": 2.678,
+      "corr": 0.391,
+      "bias": -0.127
     },
     "baselinePPG": {
-      "n": 2014,
-      "mae": 2.088,
-      "rmse": 3.116,
-      "corr": 0.315,
-      "bias": 0.049
+      "n": 2463,
+      "mae": 2.049,
+      "rmse": 3.04,
+      "corr": 0.324,
+      "bias": 0.061
     },
     "baselineForm": {
-      "n": 2014,
-      "mae": 2.089,
-      "rmse": 3.13,
-      "corr": 0.312,
-      "bias": 0.043
+      "n": 2463,
+      "mae": 2.048,
+      "rmse": 3.06,
+      "corr": 0.32,
+      "bias": 0.051
     },
     "top10Actual": {
-      "model": 4.02,
-      "ppg": 3.74,
-      "form": 3.2
+      "model": 4.18,
+      "ppg": 3.77,
+      "form": 3.33
     }
   },
   "gameweeks": [
@@ -260,6 +288,100 @@
         "model": 2.8,
         "ppg": 5.2,
         "form": 2.5
+      }
+    },
+    {
+      "gameweek": 7,
+      "variants": {
+        "odds:0": {
+          "n": 449,
+          "mae": 1.687,
+          "rmse": 2.452,
+          "corr": 0.463,
+          "bias": -0.067
+        },
+        "odds:0.3": {
+          "n": 449,
+          "mae": 1.678,
+          "rmse": 2.44,
+          "corr": 0.471,
+          "bias": -0.065
+        },
+        "odds:0.5": {
+          "n": 449,
+          "mae": 1.673,
+          "rmse": 2.433,
+          "corr": 0.475,
+          "bias": -0.063
+        },
+        "odds:0.7": {
+          "n": 449,
+          "mae": 1.669,
+          "rmse": 2.426,
+          "corr": 0.479,
+          "bias": -0.061
+        },
+        "odds:0.9": {
+          "n": 449,
+          "mae": 1.665,
+          "rmse": 2.421,
+          "corr": 0.483,
+          "bias": -0.057
+        },
+        "market:0": {
+          "n": 449,
+          "mae": 1.687,
+          "rmse": 2.452,
+          "corr": 0.463,
+          "bias": -0.067
+        },
+        "market:0.3": {
+          "n": 449,
+          "mae": 1.685,
+          "rmse": 2.451,
+          "corr": 0.463,
+          "bias": -0.067
+        },
+        "market:0.5": {
+          "n": 449,
+          "mae": 1.684,
+          "rmse": 2.451,
+          "corr": 0.464,
+          "bias": -0.067
+        },
+        "market:0.7": {
+          "n": 449,
+          "mae": 1.683,
+          "rmse": 2.451,
+          "corr": 0.464,
+          "bias": -0.067
+        }
+      },
+      "model": {
+        "n": 449,
+        "mae": 1.687,
+        "rmse": 2.452,
+        "corr": 0.463,
+        "bias": -0.067
+      },
+      "baselinePPG": {
+        "n": 449,
+        "mae": 1.872,
+        "rmse": 2.7,
+        "corr": 0.36,
+        "bias": 0.116
+      },
+      "baselineForm": {
+        "n": 449,
+        "mae": 1.865,
+        "rmse": 2.747,
+        "corr": 0.359,
+        "bias": 0.089
+      },
+      "top10Actual": {
+        "model": 5,
+        "ppg": 3.9,
+        "form": 4
       }
     }
   ]
