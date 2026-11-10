@@ -1,10 +1,10 @@
 {
-  "generated": "2026-11-04T13:11:23.933Z",
-  "oddsWeight": 0.7,
+  "generated": "2026-11-10T13:41:06.658Z",
+  "oddsWeight": 0.9,
   "marketWeight": 0,
   "measuredGameweeks": {
-    "odds": 4,
-    "market": 3
+    "odds": 5,
+    "market": 4
   },
   "minGameweeks": 2
 }
